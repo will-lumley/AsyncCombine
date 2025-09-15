@@ -5,6 +5,7 @@ It’s built on top of AsyncSequence and integrated with Swift’s Observation f
 It also ships with CurrentValueRelay, a replay-1 async primitive inspired by Combine’s `CurrentValueSubject`, giving you a simple way to bridge stateful streams between domain logic and presentation.
 
 ✨ Features
+
 **Combine-like Syntax**
 - Use .sink {}, .assign(to:on:), and .store(in:) with AsyncSequence.
 
@@ -21,6 +22,7 @@ It also ships with CurrentValueRelay, a replay-1 async primitive inspired by Com
 - Add operators like debounce, throttle, merge, etc. with Swift Async Algorithms.
 
 📦 Installation
+
 **Swift Package Manager**
 Add this to your Package.swift:
 ```swift
@@ -76,7 +78,8 @@ viewModel.observed(\.count)
 ```
 
 **Using ``CurrentValueRelay`**
-``` swift
+
+```swift
 let relay = CurrentValueRelay(false)
 var subs = Set<SubscriptionTask>()
 
