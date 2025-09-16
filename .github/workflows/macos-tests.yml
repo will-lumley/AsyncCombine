@@ -1,0 +1,57 @@
+name: "[macOS] Unit Tests"
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: macos-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache SPM (macOS)
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/.swiftpm
+          key: ${{ runner.os }}-swift-6.0-${{ hashFiles('**/Package.swift', '**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swift-6.0-
+            ${{ runner.os }}-swift-
+
+      - name: Set up Swift 6.0
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.0"
+
+      - name: Resolve dependencies
+        run: swift package resolve
+
+      - name: Build
+        run: swift build -v
+
+      - name: Test (parallel, with coverage)
+        run: swift test --parallel --enable-code-coverage
+
+      - name: Collect coverage (LLVM JSON)
+        if: always()
+        run: |
+          mkdir -p coverage
+          llvm-profdata merge -sparse .build/**/*.profdata -o coverage/coverage.profdata || true
+          cp -R .build/*/codecov* coverage/ 2>/dev/null || true
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-macos-swift-6.0
+          path: coverage

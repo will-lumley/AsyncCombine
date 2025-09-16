@@ -1,0 +1,44 @@
+name: "[Linux] Unit Tests"
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: linux-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    container: swift:6.0-jammy
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # (Optional) You chose to skip Linux caching. You can add it back later.
+
+      - name: Resolve dependencies
+        run: swift package resolve
+
+      - name: Build
+        run: swift build -v
+
+      - name: Test (parallel, with coverage)
+        run: swift test --parallel --enable-code-coverage
+
+      - name: Collect coverage (LLVM JSON)
+        if: always()
+        run: |
+          mkdir -p coverage
+          llvm-profdata merge -sparse .build/**/*.profdata -o coverage/coverage.profdata || true
+          cp -R .build/*/codecov* coverage/ 2>/dev/null || true
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-linux-swift-6.0
+          path: coverage
