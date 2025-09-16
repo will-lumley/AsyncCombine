@@ -160,7 +160,7 @@ struct AsyncSequenceSinkTests {
         cont.finish()
 
         // Enough time for all three to be processed in order
-        try? await Task.sleep(nanoseconds: 80_000_000)
+        try? await Task.sleep(for: .seconds(1))
 
         print("Snapshot: \(await recorder.snapshot())")
 
