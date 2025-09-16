@@ -5,6 +5,7 @@
 //  Created by William Lumley on 15/9/2025.
 //
 
+@testable import AsyncCombine
 import Foundation
 import Testing
 

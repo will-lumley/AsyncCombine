@@ -1,3 +1,5 @@
+![AsyncCombine: Combine's Syntax](https://raw.githubusercontent.com/will-lumley/AsyncCombine/main/AsyncCombine.png)
+
 # AsyncCombine
 
 AsyncCombine brings familiar Combine-style operators — `sink`, `assign`, and `store(in:)` — to the world of Swift Concurrency.
@@ -63,7 +65,7 @@ shapeNode // SKShapeNode
 label // UILabel
 
 viewModel.observed(\.count)
-    .map { 
+    .map {
         UIColor(
             hue: CGFloat($0 % 360) / 360,
             saturation: 1,
