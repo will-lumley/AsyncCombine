@@ -45,16 +45,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-swift-${{ matrix.swift }}-
 
-      # Linux (container): cache ONLY .build
-      - name: Cache SPM (Linux container)
-        if: runner.os == 'Linux'
-        uses: actions/cache@v4
-        with:
-          path: .build
-          key: ${{ runner.os }}-swift-${{ matrix.swift }}-${{ hashFiles('**/Package.swift') }}
-          restore-keys: |
-            ${{ runner.os }}-swift-${{ matrix.swift }}-
-
       # macOS only — install toolchain
       - name: Set up Swift ${{ matrix.swift }} (macOS)
         if: runner.os == 'macOS'
