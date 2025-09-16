@@ -20,3 +20,6 @@ public typealias ReceiveElement<Element> = @Sendable (Element) async -> Void
 ///
 /// - Parameter failure: The error thrown by the sequence.
 public typealias ReceiveError<Failure: Error> = @Sendable (Failure) -> Void
+
+
+public typealias ReceiveFinished = @Sendable () async -> Void

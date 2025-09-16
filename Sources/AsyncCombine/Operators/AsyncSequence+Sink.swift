@@ -22,6 +22,7 @@ public extension AsyncSequence where Element: Sendable, Self: Sendable {
     /// - Parameters:
     ///   - receiveError: A closure to call if the sequence throws an error
     ///     (other than cancellation). Defaults to a no-op.
+    ///   - receiveFinished: An asynchronous closure that is called once all values are emitted.
     ///   - receiveValue: An asynchronous closure to process each emitted element.
     ///     Executed for every value produced by the sequence.
     /// - Returns: A ``SubscriptionTask`` you can store in a collection
@@ -50,14 +51,15 @@ public extension AsyncSequence where Element: Sendable, Self: Sendable {
     @discardableResult
     func sink(
         catching receiveError: @escaping ReceiveError<Error> = { _ in },
+        finished receiveFinished: @escaping ReceiveFinished = {},
         _ receiveValue: @escaping ReceiveElement<Element>
     ) -> SubscriptionTask {
         return Task {
-            var iterator = makeAsyncIterator()
             do {
-                while let value = try await iterator.next() {
-                    await receiveValue(value)
+                for try await element in self {
+                    await receiveValue(element)
                 }
+                await receiveFinished()
             } catch is CancellationError {
                 // Expected on cancel
             } catch {
