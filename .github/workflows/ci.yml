@@ -25,12 +25,35 @@ jobs:
           - os: ubuntu-24.04
             swift: "6.0"
             container: swift:6.0-jammy
-    # Only applies to the matrix rows that define it (Ubuntu)
+
+    # Only applies to the Ubuntu row
     container: ${{ matrix.container }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # macOS: cache .build + ~/.swiftpm
+      - name: Cache SPM (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/.swiftpm
+          key: ${{ runner.os }}-swift-${{ matrix.swift }}-${{ hashFiles('**/Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-swift-${{ matrix.swift }}-
+
+      # Linux (container): cache ONLY .build
+      - name: Cache SPM (Linux container)
+        if: runner.os == 'Linux'
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-swift-${{ matrix.swift }}-${{ hashFiles('**/Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-swift-${{ matrix.swift }}-
 
       # macOS only — install toolchain
       - name: Set up Swift ${{ matrix.swift }} (macOS)
@@ -39,18 +62,10 @@ jobs:
         with:
           swift-version: ${{ matrix.swift }}
 
-      # Linux container already has Swift, so no setup step there
+      # Linux container already has Swift
 
-      # Cache works in both environments
-      - name: Cache SPM
-        uses: actions/cache@v4
-        with:
-          path: |
-            .build
-            ~/.swiftpm
-          key: ${{ runner.os }}-swift-${{ matrix.swift }}-${{ hashFiles('**/Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-swift-${{ matrix.swift }}-
+      - name: Resolve dependencies
+        run: swift package resolve
 
       - name: Build
         run: swift build -v
