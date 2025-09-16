@@ -3,9 +3,7 @@
 # AsyncCombine
 
 <p align="center">
-  <img src="https://github.com/will-lumley/FaviconFinder/actions/workflows/BuildTests-iOS.yml/badge.svg?branch=main" alt="iOS - CI Status">
-  <img src="https://github.com/will-lumley/FaviconFinder/actions/workflows/BuildTests-linux.yml/badge.svg?branch=main" alt="macOS - CI Status">
-  <img src="https://github.com/will-lumley/FaviconFinder/actions/workflows/BuildTests-macOS.yml/badge.svg?branch=main" alt="Linux - CI Status">
+  <img src="https://github.com/will-lumley/AsyncCombine/actions/workflows/ci.yml/badge.svg?branch=main" alt="Apple - CI Status">
 </p>
 <p align="center">
   <a href="https://github.com/apple/swift-package-manager"><img src="https://img.shields.io/badge/SPM-compatible-4BC51D.svg?style=flat" alt="SPM Compatible"></a>
@@ -48,7 +46,7 @@ It also ships with CurrentValueRelay, a replay-1 async primitive inspired by Com
 - `CurrentValueRelay<Value>` holds the latest value and broadcasts it to all listeners.
 - Similar to Combine’s `CurrentValueSubject`, but actor-isolated and async-first.
 - Exposes an AsyncStream for easy consumption in UI or domain code.
-  
+
 ### ⚡ Async Algorithms Compatible
 - Compose richer pipelines using Swift Async Algorithms.
 - Add `.debounce`, `.throttle`, `.merge`, `.zip`, and more to your async streams.
