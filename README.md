@@ -3,7 +3,8 @@
 # AsyncCombine
 
 <p align="center">
-  <img src="https://github.com/will-lumley/AsyncCombine/actions/workflows/ci.yml/badge.svg?branch=main" alt="Apple - CI Status">
+    <img src="https://github.com/will-lumley/AsyncCombine/actions/workflows/macos-tests.yml/badge.svg?branch=main" alt="Apple - CI Status">
+    <img src="https://github.com/will-lumley/AsyncCombine/actions/workflows/linux-tests.yml/badge.svg?branch=main" alt="Linux - CI Status">
 </p>
 <p align="center">
   <a href="https://github.com/apple/swift-package-manager"><img src="https://img.shields.io/badge/SPM-compatible-4BC51D.svg?style=flat" alt="SPM Compatible"></a>
