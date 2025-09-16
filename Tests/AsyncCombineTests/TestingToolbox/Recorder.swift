@@ -11,7 +11,6 @@ actor Recorder<T: Sendable> {
     private var values: [T] = []
 
     func append(_ value: T) {
-        print("AppendingValue: \(value)")
         self.values.append(value)
     }
 

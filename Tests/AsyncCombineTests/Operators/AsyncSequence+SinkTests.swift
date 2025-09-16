@@ -156,10 +156,13 @@ struct AsyncSequenceSinkTests {
         cont.yield(1)
         cont.yield(2)
         cont.yield(3)
+
         cont.finish()
 
         // Enough time for all three to be processed in order
         try? await Task.sleep(nanoseconds: 80_000_000)
+
+        print("Snapshot: \(await recorder.snapshot())")
 
         #expect(await recorder.snapshot() == [1, 2, 3])
 
