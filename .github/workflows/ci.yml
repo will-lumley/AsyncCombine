@@ -1,14 +1,3 @@
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build-and-test:
     name: Swift ${{ matrix.swift }} on ${{ matrix.os }}
@@ -16,19 +5,32 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-latest]
-        swift: ["6.0"]
+        include:
+          # macOS: no container, use setup-swift
+          - os: macos-latest
+            swift: "6.0"
+
+          # Linux: run inside official Swift container (no setup-swift needed)
+          - os: ubuntu-24.04
+            swift: "6.0"
+            container: swift:6.0-jammy
+    # Only applies to the matrix rows that define it (Ubuntu)
+    container: ${{ matrix.container }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Install Swift toolchain for this OS/runner
-      - name: Set up Swift ${{ matrix.swift }}
+      # macOS only — install toolchain
+      - name: Set up Swift ${{ matrix.swift }} (macOS)
+        if: runner.os == 'macOS'
         uses: swift-actions/setup-swift@v2
         with:
           swift-version: ${{ matrix.swift }}
 
-      # (Optional) cache SPM builds to speed up CI
+      # Linux container already has Swift, so no setup step there
+
+      # Cache works in both environments
       - name: Cache SPM
         uses: actions/cache@v4
         with:
@@ -45,13 +47,11 @@ jobs:
       - name: Test (parallel, with coverage)
         run: swift test --parallel --enable-code-coverage
 
-      # (Optional) save coverage artifacts; you can feed these to codecov later
       - name: Collect coverage (LLVM JSON)
         if: always()
         run: |
           mkdir -p coverage
           llvm-profdata merge -sparse .build/**/*.profdata -o coverage/coverage.profdata || true
-          # Save raw data too; different runners store paths slightly differently
           cp -R .build/*/codecov* coverage/ 2>/dev/null || true
 
       - name: Upload coverage artifact
