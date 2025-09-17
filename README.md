@@ -17,13 +17,51 @@
   </a>
 </p>
 
-AsyncCombine brings familiar Combine-style operators like `sink`, `assign`, and `store(in:)` — to the world of Swift Concurrency.
+AsyncCombine brings familiar Combine-style operators like `sink`, `assign`, and `store(in:)` to the world of Swift Concurrency.
 
 While Swift Concurrency has certainly been an improvement over Combine when combined (heh) with swift-async-algorithms, managing multiple subscriptions can be quite a messy process.
 
 Introducing, AsyncCombine! It’s built on top of `AsyncSequence` and integrated with Swift’s `Observation` framework, so you can react to `@Observable` model changes, bind values to UI, and manage state, all without importing Combine. Beacuse of this, it works on any platform that Swift runs on, from iOS and macOS to Linux and SwiftWasm.
 
 It also ships with CurrentValueRelay, a replay-1 async primitive inspired by Combine’s `CurrentValueSubject`, giving you a simple way to bridge stateful streams between domain logic and presentation.
+
+While async/await brought clarity and safety to Swift’s concurrency story, working directly with AsyncSequence can sometimes feel verbose and clunky, especially when compared to Combine’s elegant, declarative pipelines. With Combine, you chain operators fluently (map → filter → sink) and manage lifetimes in one place. By contrast, async/await often forces you into nested for await loops, manual task management, and boilerplate cancellation. AsyncCombine bridges this gap: it keeps the expressive syntax and ergonomics of Combine while running entirely on Swift Concurrency. You get the readability of Combine pipelines, without the overhead of pulling in Combine itself or losing portability.
+
+Let's get into the nuts and bolts of it all and look into how AsyncCombine can improve your Swift Concurrency exerience.
+
+So say you have a View Model like below.
+```swift
+@Observable @MainActor
+final class CounterViewModel {
+    var count: Int = 0
+}
+```
+
+In a traditional async/await setup, you would listen to the new value being published like so.
+```swift
+let viewModel = CounterViewModel()
+
+let countChanges = Observations {
+    self.viewModel.count
+}
+
+Task {
+    for await count in countChanges.map({ "Count: \($0)" }) {
+        print("\(count)")
+    }
+}
+```
+
+However with AsyncCombine you can express the same logic in a more concise and easy to read format.
+```swift
+var subscriptions = Set<SubscriptionTask>()
+
+viewModel.observed(\.count)
+    .map { "Count: \($0)" }
+    .sink { print($0) }
+    .store(in: &subscriptions)
+```
+
 
 ## ✨ Features
 
