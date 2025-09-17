@@ -238,7 +238,7 @@ SwiftUI already observes `@Observable` models. You usually don’t need `observe
 Add this to your Package.swift:
 ```swift
 dependencies: [
-    .package(url: "https://github.com/will-lumley/AsyncCombine.git", from: "1.0.0")
+    .package(url: "https://github.com/will-lumley/AsyncCombine.git", from: "1.0.1")
 ]
 ```
 
