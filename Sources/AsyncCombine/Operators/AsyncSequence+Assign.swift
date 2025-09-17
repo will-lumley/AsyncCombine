@@ -57,7 +57,7 @@ public extension AsyncSequence where Element: Sendable, Self: Sendable {
     func assign<Root: AnyObject & Sendable>(
         to keyPath: ReferenceWritableKeyPath<Root, Element>,
         on object: Root,
-        catching receiveError: @Sendable @escaping (Error) -> Void = { _ in }
+        catching receiveError: @escaping ReceiveError<Error>
     ) -> SubscriptionTask {
         let kp = NonSendableBox(keyPath)
 
