@@ -28,7 +28,8 @@ struct AssignToOnTests {
 
         // Start assignment
         stream
-            .assign(to: \.text, on: label).store(in: &subs)
+            .assign(to: \.text, on: label)
+            .store(in: &subs)
 
         // Emit a few values
         cont.yield("One")
