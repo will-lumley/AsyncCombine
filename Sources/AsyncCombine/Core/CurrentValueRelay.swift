@@ -98,13 +98,15 @@ public extension CurrentValueRelay {
     /// // "Got: initial"
     /// // "Got: update"
     /// ```
-    func stream() -> AsyncStream<Value> {
+    nonisolated func stream() -> AsyncStream<Value> {
         AsyncStream { continuation in
             let id = UUID()
 
             // Register our continuation so we can broadcast to it
             // later on.
-            self.register(id: id, continuation: continuation)
+            Task {
+                await self.register(id: id, continuation: continuation)
+            }
 
             // If the continuation is terminated
             continuation.onTermination = { [weak self] _ in
