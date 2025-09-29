@@ -12,6 +12,17 @@ public enum AsyncCombine { }
 
 public extension AsyncCombine {
 
+    /// Returns an AsyncStream that emits the latest pair from two AsyncSequences
+    /// once both have produced at least one value. Subsequent emissions occur
+    /// whenever either upstream produces a new value. The stream finishes when
+    /// **both** upstream sequences finish.
+    ///
+    /// Cancellation of the returned Task cancels both upstream consumers.
+    ///
+    /// - Parameters:
+    ///   - stream1: First async sequence
+    ///   - stream2: Second async sequence
+    /// - Returns: AsyncStream of `(Element1, Element2)` tuples (combineLatest)
     static func combine<Stream1, Stream2>(
         _ stream1: Stream1,
         _ stream2: Stream2

@@ -77,23 +77,29 @@ viewModel.observed(\.count)
 - Automatically replay the current value, then emit fresh values whenever the property changes.
 - Perfect for keeping UI state in sync with your models.
 
-### 🌍 Cross-Platform
-- AsyncCombine doesn’t rely on Combine or other Apple-only frameworks.
-- Runs anywhere Swift Concurrency works: iOS, macOS, tvOS, watchOS.
-- Fully portable to Linux and even SwiftWasm for server-side and web targets.
-- Ideal for writing platform-agnostic domain logic and unit tests.
-
-### 🔁 State Relay
+### 🔁 CurrentValueSubject Replacement
 - Ship values through your app with a hot, replay-1 async primitive.
 - `CurrentValueRelay<Value>` holds the latest value and broadcasts it to all listeners.
 - Similar to Combine’s `CurrentValueSubject`, but actor-isolated and async-first.
 - Exposes an AsyncStream for easy consumption in UI or domain code.
+
+### 🔗 Publishers.CombineLatest Replacement
+- Pair two AsyncSequences and emit the latest tuple whenever either side produces a new element (after both have emitted at least once).
+- Finishes when both upstream sequences finish (CombineLatest semantics).
+- Cancellation of the downstream task cancels both upstream consumers.
+- Plays nicely with Swift Async Algorithms (e.g. you can map, debounce, etc. before/after).
 
 ### ⚡ Async Algorithms Compatible
 - Compose richer pipelines using Swift Async Algorithms.
 - Add `.debounce`, `.throttle`, `.merge`, `.zip`, and more to your async streams.
 - Chain seamlessly with AsyncCombine operators (`sink`, `assign`, etc.).
 - Great for smoothing UI inputs, combining event streams, and building complex state machines.
+
+### 🌍 Cross-Platform
+- AsyncCombine doesn’t rely on Combine or other Apple-only frameworks.
+- Runs anywhere Swift Concurrency works: iOS, macOS, tvOS, watchOS.
+- Fully portable to Linux and even SwiftWasm for server-side and web targets.
+- Ideal for writing platform-agnostic domain logic and unit tests.
 
 ## 🚀 Usage
 
@@ -166,6 +172,48 @@ Cancel tasks when you’re done (e.g., deinit).
 
 ```swift
 subs.cancelAll()
+```
+
+### Combine multiple AsyncSequences into a single AsyncSequence
+
+```swift
+import AsyncAlgorithms
+import AsyncCombine
+
+// Two arbitrary async streams
+let a = AsyncStream<Int> { cont in
+    Task {
+        for i in 1...3 {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            cont.yield(i)   // 1, 2, 3
+        }
+        cont.finish()
+    }
+}
+
+let b = AsyncStream<String> { cont in
+    Task {
+        for s in ["A", "B"] {
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            cont.yield(s)   // "A", "B"
+        }
+        cont.finish()
+    }
+}
+
+// combineLatest-style pairing
+var tasks = Set<SubscriptionTask>()
+
+AsyncCombine.combine(a, b)
+    .map { i, s in "Pair: \(i) & \(s)" }
+    .sink { print($0) }
+    .store(in: &tasks)
+
+// Prints (timing-dependent, after both have emitted once):
+// "Pair: 2 & A"
+// "Pair: 3 & A"
+// "Pair: 3 & B"
+
 ```
 
 ### Debounce, throttle, merge (with Swift Async Algorithms)
