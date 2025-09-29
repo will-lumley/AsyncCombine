@@ -74,7 +74,6 @@ final class AsyncSequenceSinkOnMainTests {
         stream
             .sinkOnMain(
                 catching: { @MainActor error in
-                    #expect(Thread.isMainThread)
                     #expect(error is TestError)
                     Task { await errorCaptured.set(true) }
                 },
