@@ -9,141 +9,187 @@
 import Foundation
 import Testing
 
-// A simple UI-like target that must be mutated on the main actor.
+@Suite("AsyncSequence+Assign Tests", .serialized, .timeLimit(.minutes(1)))
 @MainActor
-final class Label: @unchecked Sendable {
-    var text: String = ""
-}
+class AssignToOnTests {
 
-@Suite("AsyncSequence+Assign Tests")
-struct AssignToOnTests {
+    // MARK: - Properties
 
-    @MainActor
+    /// A convenient place to store our tasks
+    var tasks = Set<SubscriptionTask>()
+
+    /// A test label that holds a `String` value and is a `MainActor`
+    let label = Label()
+
+    // MARK: - Lifecycle
+
+    deinit {
+        // Clean up after ourselves
+        self.tasks.cancelAll()
+    }
+
+    // MARK: - Tests
+
     @Test("Assigns values to the object on MainActor")
     func assignsValuesOnMainActor() async {
-        let label = Label()
         let (stream, cont) = AsyncStream<String>.makeStream()
 
-        var subs = Set<SubscriptionTask>()
-
-        // Start assignment
+        // GIVEN we assign our stream value to `.text` to our `label`
         stream
             .assign(to: \.text, on: label)
-            .store(in: &subs)
+            .store(in: &tasks)
 
-        // Emit a few values
+        // Wait for the label to actually receive "Three"
+        let done = Task {
+            return await label.observed(\.text)
+                .first { @Sendable in $0 == "Three" }
+        }
+
+        // THEN we emit some values
         cont.yield("One")
         cont.yield("Two")
         cont.yield("Three")
 
-        // Give the sink time to hop to MainActor and assign
-        try? await Task.sleep(nanoseconds: 50_000_000)
         cont.finish()
 
-        // Verify last value is assigned (read on main actor)
-        let finalText = label.text
-        #expect(finalText == "Three")
+        // Wait for the assigning to be completed
+        _ = await done.value
 
-        // Cleanup
-        subs.cancelAll()
+        // THEN the last value emitted is assigned
+        #expect(label.text == "Three")
     }
 
-    @MainActor
     @Test("Cancelling the Returned Task Stops Further Assignments")
-    func cancelStopsAssignments() async {
-        let label = Label()
+    func cancelStopsAssignments() async throws {
         let (stream, cont) = AsyncStream<String>.makeStream()
 
-        let task = stream.assign(to: \.text, on: label)
+        // GIVEN we assign our stream value to `.text` to our `label`
+        stream
+            .assign(to: \.text, on: label)
+            .store(in: &tasks)
 
-        var subs = Set<SubscriptionTask>()
-        task.store(in: &subs)
+        // Wait for the label to actually receive "Before Cancel"
+        let done = Task {
+            return await label.observed(\.text)
+                .first { @Sendable in $0 == "Before Cancel" }
+        }
 
-        // First value should apply
+        // WHEN we emit a "Before Cancel" string
         cont.yield("Before Cancel")
-        try? await Task.sleep(nanoseconds: 40_000_000)
+
+        // Wait for the assigning to be completed
+        _ = await done.value
+
+        // THEN our label is "Before Cancel"
         #expect(label.text == "Before Cancel")
 
-        // Cancel and then send more
-        subs.cancelAll() // or: task.cancel()
-        try? await Task.sleep(nanoseconds: 10_000_000)
+        // WHEN we cancel our tasks
+        self.tasks.cancelAll()
 
+        // WHEN we emit an "After Cancel" string
         cont.yield("After Cancel")
-        try? await Task.sleep(nanoseconds: 40_000_000)
 
-        // Should not update after cancellation
+        // We'll use a hacky `.sleep()` here because we don't have a
+        // handle on the task anymore as we cancelled it
+        try await Task.sleep(for: .milliseconds(500))
+
+        // THEN our label shouldn't be updated because we
+        // cancelled our tasks
         #expect(label.text == "Before Cancel")
 
         cont.finish()
     }
 
-    @MainActor
     @Test("No Crash or Assignment After Target Deallocation (weak capture)")
-    func noAssignmentAfterDeinit() async {
+    func noAssignmentAfterDeinit() async throws {
         weak var weakLabel: Label?
         var strongLabel: Label? = Label()
+
         weakLabel = strongLabel
 
         let (stream, cont) = AsyncStream<String>.makeStream()
 
-        var subs = Set<SubscriptionTask>()
-        // Start assignment while object is alive
-        stream.assign(to: \.text, on: strongLabel!).store(in: &subs)
+        // GIVEN we create an assignment while the object is alive
+        stream
+            .assign(to: \.text, on: strongLabel!)
+            .store(in: &tasks)
 
+        // Wait for the label to actually receive "Alive"
+        let done = Task {
+            return await strongLabel!.observed(\.text)
+                .first { @Sendable in $0 == "Alive" }
+        }
+
+        // WHEN we emit "Alive"
         cont.yield("Alive")
-        try? await Task.sleep(nanoseconds: 40_000_000)
+
+        // Wait for the assigning to be completed
+        _ = await done.value
+
+        // THEN the `strongLabel` is assigned "Alive"
         #expect(strongLabel?.text == "Alive")
 
-        // Drop the strong reference — assignment closure captures [weak object]
+        // GIVEN we drop the strong reference - assignment closure captures [weak object]
         strongLabel = nil
         #expect(weakLabel == nil)
 
-        // Emit more values — should be ignored (and not crash)
+        // WHEN we emit more values — should be ignored (and not crash)
         cont.yield("Ignored")
         cont.yield("Also Ignored")
-        try? await Task.sleep(nanoseconds: 40_000_000)
+
+        // We'll use a hacky `.sleep()` here because we don't have a
+        // handle on the task anymore as we cancelled it
+        try await Task.sleep(for: .milliseconds(500))
+
         cont.finish()
 
         // Nothing to assert on the deallocated label; test passes if no crash
-        subs.cancelAll()
+        self.tasks.cancelAll()
     }
 
-    @MainActor
     @Test("Propagates Sequence Errors to the Catching Closure")
-    func errorPropagation() async {
-        enum TestError: Error, Equatable {
-            case boom
-        }
-
+    func errorPropagation() async throws {
         // Build an AsyncThrowingStream that emits then fails
         let (stream, cont) = AsyncThrowingStream<String, Error>.makeStream()
 
         // Track the error callback
         let errorBox = AsyncBox<Error?>(nil)
-        let label = Label()
 
-        var subs = Set<SubscriptionTask>()
-        stream.assign(to: \.text, on: label) { error in
-            Task { await errorBox.set(error) }
+        // GIVEN we create an assignment while the object is alive
+        stream
+            .assign(to: \.text, on: label) { error in
+                Task {
+                    await errorBox.set(error)
+                }
+            }
+            .store(in: &tasks)
+
+        // Wait for the label to actually receive "Hello"
+        let done = Task {
+            return await label.observed(\.text)
+                .first { @Sendable in $0 == "Hello" }
         }
-        .store(in: &subs)
 
-        // Emit one value, then fail
+        // WHEN we emit one value, then fail
         cont.yield("Hello")
-        try? await Task.sleep(nanoseconds: 40_000_000)
+
+        // Wait for the assigning to be completed
+        _ = await done.value
+
         #expect(label.text == "Hello")
 
+        // WHEN we finish with an error
         cont.finish(throwing: TestError.boom)
 
-        // Give the error closure time to run
-        try? await Task.sleep(nanoseconds: 40_000_000)
+        // Wait a hot minute for the error to propogate
+        try await Task.sleep(for: .milliseconds(500))
 
-        // Validate error surfaced
+        // THEN the error we have
         let receivedError = await errorBox.get()
         #expect(receivedError is TestError)
 
         // Cleanup
-        subs.cancelAll()
+        self.tasks.cancelAll()
     }
 
 }

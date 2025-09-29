@@ -69,4 +69,25 @@ public extension AsyncSequence where Element: Sendable, Self: Sendable {
         }
     }
 
+    /// Like `sink`, but guarantees the value/finish handlers run on the main actor.
+    @discardableResult
+    func sinkOnMain(
+        catching receiveError: @escaping MainActorReceiveError<Error> = { _ in },
+        finished receiveFinished: @escaping MainActorReceiveFinished = {},
+        _ receiveValue: @escaping MainActorReceiveElement<Element>
+    ) -> SubscriptionTask {
+        return Task {
+            do {
+                for try await element in self {
+                    await receiveValue(element)
+                }
+                await receiveFinished()
+            } catch is CancellationError {
+                // Expected on cancel
+            } catch {
+                await receiveError(error)
+            }
+        }
+    }
+
 }

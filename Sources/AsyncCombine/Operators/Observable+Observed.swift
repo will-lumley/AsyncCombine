@@ -88,6 +88,7 @@ public extension Observable where Self: AnyObject {
                         continuation.finish()
                         return
                     }
+
                     withObservationTracking {
                         // Register the read
                         _ = obj[keyPath: kp.value]

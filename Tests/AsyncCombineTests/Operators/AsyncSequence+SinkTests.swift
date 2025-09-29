@@ -9,8 +9,23 @@
 import Foundation
 import Testing
 
-@Suite("AsyncSequence+Sink Tests")
-struct AsyncSequenceSinkTests {
+@Suite("AsyncSequence+Sink Tests", .serialized, .timeLimit(.minutes(1)))
+@MainActor
+final class AsyncSequenceSinkTests {
+
+    // MARK: - Properties
+
+    /// A convenient place to store our tasks
+    private var tasks = Set<SubscriptionTask>()
+
+    // MARK: - Lifecycle
+
+    deinit {
+        // Clean up after ourselves
+        self.tasks.cancelAll()
+    }
+
+    // MARK: - Tests
 
     @Test("Delivers Values in Order and Does Not Call receiveError on Normal Completion")
     func deliversInOrderNoErrorOnFinish() async {
@@ -18,28 +33,32 @@ struct AsyncSequenceSinkTests {
         let recorder = Recorder<Int>()
         let errorCalled = AsyncBox(false)
 
-        let task = stream.sink(catching: { _ in
-            Task { await errorCalled.set(true) }
-        }) { value in
-            await recorder.append(value)
-        }
+        // GIVEN we sink values, recording each one, and tracking error calls
+        stream
+            .sink(
+                catching: { _ in
+                    Task {
+                        await errorCalled.set(true)
+                    }
+                }, { value in
+                    await recorder.append(value)
+                }
+            )
+        .store(in: &tasks)
 
-        var subs = Set<SubscriptionTask>()
-        task.store(in: &subs)
-
+        // WHEN we emit some values
         cont.yield(1)
         cont.yield(2)
         cont.yield(3)
 
-        try? await Task.sleep(nanoseconds: 40_000_000)
+        // Give the sink a moment to process, then finish cleanly
+        try? await Task.sleep(for: .milliseconds(40))
         cont.finish()
+        try? await Task.sleep(for: .milliseconds(40))
 
-        try? await Task.sleep(nanoseconds: 40_000_000)
-
+        // THEN values were delivered in order and no error callback was invoked
         #expect(await recorder.snapshot() == [1, 2, 3])
         #expect(await errorCalled.get() == false)
-
-        subs.cancelAll()
     }
 
     @Test("Cancelling the Returned Task Stops Further Values")
@@ -47,26 +66,29 @@ struct AsyncSequenceSinkTests {
         let (stream, cont) = AsyncStream<String>.makeStream()
         let recorder = Recorder<String>()
 
-        let task = stream.sink { value in
+        // GIVEN a sink storing into our task set
+        stream.sink { value in
             await recorder.append(value)
         }
+        .store(in: &tasks)
 
-        var subs = Set<SubscriptionTask>()
-        task.store(in: &subs)
-
+        // WHEN we emit an initial value
         cont.yield("A")
-        try? await Task.sleep(nanoseconds: 20_000_000)
+        try? await Task.sleep(for: .milliseconds(20))
+
+        // THEN the recorder has the first value
         #expect(await recorder.snapshot() == ["A"])
 
-        // Cancel then try to send more values
-        subs.cancelAll()
-        try? await Task.sleep(nanoseconds: 10_000_000)
+        // WHEN we cancel all subscriptions
+        self.tasks.cancelAll()
+        try? await Task.sleep(for: .milliseconds(10))
 
+        // AND try to emit more values after cancellation
         cont.yield("B")
         cont.yield("C")
-        try? await Task.sleep(nanoseconds: 40_000_000)
+        try? await Task.sleep(for: .milliseconds(40))
 
-        // Still only the pre-cancel value(s)
+        // THEN no further values were recorded
         #expect(await recorder.snapshot() == ["A"])
 
         cont.finish()
@@ -80,34 +102,31 @@ struct AsyncSequenceSinkTests {
         let recorder = Recorder<String>()
         let capturedError = AsyncBox<Error?>(nil)
 
-        let t = stream.sink(catching: { error in
+        // GIVEN a throwing stream whose errors are surfaced via `catching`
+        stream.sink(catching: { error in
             Task { await capturedError.set(error) }
         }) { value in
             await recorder.append(value)
         }
+        .store(in: &tasks)
 
-        var subs = Set<SubscriptionTask>()
-        t.store(in: &subs)
-
+        // WHEN we emit one value
         cont.yield("ok-1")
-        try? await Task.sleep(nanoseconds: 20_000_000)
+        try? await Task.sleep(for: .milliseconds(20))
         #expect(await recorder.snapshot() == ["ok-1"])
 
-        // Fail the stream
+        // AND then fail the stream
         cont.finish(throwing: TestError.boom)
+        try? await Task.sleep(for: .milliseconds(40))
 
-        try? await Task.sleep(nanoseconds: 40_000_000)
-
-        // Error should be surfaced, and no further values processed
+        // THEN the error is captured
         let err = await capturedError.get()
         #expect(err is TestError)
 
-        // Even if we try to yield after failure (no-op), nothing should change
+        // AND further values (even if attempted) are ignored
         cont.yield("after-error")
-        try? await Task.sleep(nanoseconds: 20_000_000)
+        try? await Task.sleep(for: .milliseconds(20))
         #expect(await recorder.snapshot() == ["ok-1"])
-
-        subs.cancelAll()
     }
 
     @Test("Storing in a Set Allows Mass-Cancellation via cancelAll()")
@@ -115,24 +134,26 @@ struct AsyncSequenceSinkTests {
         let (stream, cont) = AsyncStream<Int>.makeStream()
         let recorder = Recorder<Int>()
 
-        var subs = Set<SubscriptionTask>()
+        // GIVEN a sink stored in our shared task set
         stream.sink { value in
             await recorder.append(value)
         }
-        .store(in: &subs)
+        .store(in: &tasks)
 
-        #expect(subs.isEmpty == false)
+        #expect(tasks.isEmpty == false)
 
+        // WHEN we emit values
         cont.yield(10)
         cont.yield(20)
-        try? await Task.sleep(nanoseconds: 30_000_000)
+        try? await Task.sleep(for: .milliseconds(30))
         #expect(await recorder.snapshot() == [10, 20])
 
-        subs.cancelAll()
+        // AND cancel everything
+        self.tasks.cancelAll()
 
-        // Further values should be ignored after cancelAll
+        // THEN further emissions are ignored
         cont.yield(30)
-        try? await Task.sleep(nanoseconds: 30_000_000)
+        try? await Task.sleep(for: .milliseconds(30))
         #expect(await recorder.snapshot() == [10, 20])
 
         cont.finish()
@@ -143,30 +164,21 @@ struct AsyncSequenceSinkTests {
         let (stream, cont) = AsyncStream<Int>.makeStream()
         let recorder = Recorder<Int>()
 
-        let task = stream.sink { value in
-            // Simulate a bit of work per element to ensure sequential awaiting
-            try? await Task.sleep(nanoseconds: 15_000_000)
+        // GIVEN a sink that simulates per-element work to test ordering
+        stream.sink { value in
+            try? await Task.sleep(for: .milliseconds(15)) // simulate work
             await recorder.append(value)
         }
+        .store(in: &tasks)
 
-        var subs = Set<SubscriptionTask>()
-        task.store(in: &subs)
-
-        // Push a quick burst
+        // WHEN we push a quick burst and then finish
         cont.yield(1)
         cont.yield(2)
         cont.yield(3)
-
         cont.finish()
 
-        // Enough time for all three to be processed in order
+        // THEN all three are processed in order despite suspension
         try? await Task.sleep(for: .seconds(1))
-
-        print("Snapshot: \(await recorder.snapshot())")
-
         #expect(await recorder.snapshot() == [1, 2, 3])
-
-        subs.cancelAll()
     }
-
 }

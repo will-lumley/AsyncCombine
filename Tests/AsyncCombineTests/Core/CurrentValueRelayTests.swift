@@ -9,30 +9,36 @@
 import Foundation
 import Testing
 
-@Suite("CurrentValueRelayTests")
+@Suite("CurrentValueRelayTests", .timeLimit(.minutes(1)))
 struct CurrentValueRelayTests {
 
     @Test("Replays Initial Value to a New Subscriber")
     func replayInitialValue() async {
+        // GIVEN we have a relay of 42
         let relay = CurrentValueRelay<Int>(42)
 
-        // First subscriber should immediately receive 42
-        let value = await relay.stream().collect()
-        #expect(value == 42)
+        // WHEN we subscribe to the relay
+        let stream = relay.stream()
+
+        // THEN we should immediately receive the value of 42
+        #expect(await stream.collect() == 42)
     }
 
     @Test("Emits Subsequent Updates to Existing Subscribers")
     func emitsSubsequentUpdates() async {
+        // GIVEN we have a relay of 0
         let relay = CurrentValueRelay<Int>(0)
 
-        // Start consuming before sending updates
-        let stream = await relay.stream()
+        // WHEN we subscribe to the relay
+        let stream = relay.stream()
 
-        // Produce a few values
+        try? await Task.sleep(nanoseconds: 40_000_000)
+
+        // WHEN we send through 1 and 2
         await relay.send(1)
         await relay.send(2)
 
-        // Expect: replay(1) of initial 0, then 1 and 2
+        // THEN we should receive 1, 2, and 3
         let values = await stream.collect(count: 3)
         #expect(values == [0, 1, 2])
     }
@@ -55,8 +61,10 @@ struct CurrentValueRelayTests {
         let relay = CurrentValueRelay<Int>(10)
 
         // Two independent subscribers
-        let stream1 = await relay.stream()
-        let stream2 = await relay.stream()
+        let stream1 = relay.stream()
+        let stream2 = relay.stream()
+
+        try? await Task.sleep(nanoseconds: 40_000_000)
 
         // Push two updates
         await relay.send(11)

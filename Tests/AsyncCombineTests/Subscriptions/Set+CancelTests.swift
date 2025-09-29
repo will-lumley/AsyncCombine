@@ -8,8 +8,31 @@
 @testable import AsyncCombine
 import Testing
 
-@Suite("Set+Cancel Tests")
+@Suite(
+    "Set+Cancel Tests",
+    .serialized,
+    .timeLimit(.minutes(1))
+)
 struct SetCancelTests {
+
+    // MARK: - Helpers
+
+    /// Waits until `condition` returns true or the timeout elapses.
+    private func waitUntil(
+        _ condition: @Sendable () async -> Bool,
+        timeout: Duration = .seconds(1)
+    ) async -> Bool {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+
+        while clock.now < deadline {
+            if await condition() { return true }
+            await Task.yield()
+        }
+        return await condition()
+    }
+
+    // MARK: - Tests
 
     @Test("Cancels All Tasks and Empties the Set")
     func cancelsAndEmpties() async {
@@ -19,8 +42,7 @@ struct SetCancelTests {
 
         var subscriptions = Set<SubscriptionTask>()
         for sentinel in sentinels {
-            await sentinel.start()
-                .store(in: &subscriptions)
+            await sentinel.start().store(in: &subscriptions)
         }
 
         #expect(subscriptions.count == 3)
@@ -28,16 +50,19 @@ struct SetCancelTests {
         // WHEN cancelling all
         subscriptions.cancelAll()
 
-        // THEN set is empty and all tasks reported cancellation
-        // via the probes.
+        // THEN set is empty and all tasks reported cancellation via the probes
         #expect(subscriptions.isEmpty)
 
-        // ~80 ms
-        try? await Task.sleep(nanoseconds: 80_000_000)
+        // Wait deterministically for all probes to observe cancellation
+        let allCancelled = await waitUntil({
+            for probe in probes {
+                if !(await probe.wasCancelled()) { return false }
+            }
+            return true
+        }, timeout: .seconds(1))
 
-        for probe in probes {
-            #expect(await probe.wasCancelled())
-        }
+        #expect(allCancelled)
+        _ = sentinels
     }
 
     @Test("Calling cancelAll on an Empty Set is a No-Op")
@@ -55,33 +80,30 @@ struct SetCancelTests {
         let sentinel = CancellationSentinel(probe: probe)
 
         var subscriptions = Set<SubscriptionTask>()
-        await sentinel.start()
-            .store(in: &subscriptions)
+        await sentinel.start().store(in: &subscriptions)
 
+        // WHEN cancelling once
         subscriptions.cancelAll()
         #expect(subscriptions.isEmpty)
 
-        // Call again — should remain empty and not crash
+        // AND cancelling again — should remain empty and not crash
         subscriptions.cancelAll()
         #expect(subscriptions.isEmpty)
 
-        // ~80 ms
-        try? await Task.sleep(nanoseconds: 80_000_000)
-
-        #expect(await probe.wasCancelled())
+        // THEN the sentinel's probe eventually observes cancellation
+        let cancelled = await waitUntil({ await probe.wasCancelled() }, timeout: .seconds(1))
+        #expect(cancelled)
         _ = sentinel
     }
 
     @Test("Removes Tasks Even if Some Already Completed")
     func removesAlreadyCompletedTasks() async {
-        // A task that finishes quickly (not cancelled)
+        // GIVEN a task that finishes quickly (not cancelled)
         let quickTask: SubscriptionTask = Task {
-            // finish naturally
             try? await Task.sleep(nanoseconds: 10_000_000)
-            // No cancellation mark expected
         }
 
-        // A long-lived task owned by a sentinel that should be cancelled
+        // AND a long-lived task owned by a sentinel that should be cancelled
         let longProbe = CancelProbe()
         let longSentinel = CancellationSentinel(probe: longProbe)
         let longTask = await longSentinel.start()
@@ -92,17 +114,18 @@ struct SetCancelTests {
 
         #expect(subscriptions.count == 2)
 
-        // Give quickTask time to finish on its own
-        try? await Task.sleep(nanoseconds: 30_000_000)
+        // Give quickTask time to finish deterministically
+        await quickTask.value
 
+        // WHEN we cancel all
         subscriptions.cancelAll()
+
+        // THEN the set is emptied and the long task reports cancellation
         #expect(subscriptions.isEmpty)
 
-        // ~80 ms
-        try? await Task.sleep(nanoseconds: 80_000_000)
-
-        // quickTask should have completed (not cancelled); only longSentinel marks its probe
-        #expect(await longProbe.wasCancelled())
+        let longWasCancelled = await waitUntil({ await longProbe.wasCancelled() }, timeout: .seconds(1))
+        #expect(longWasCancelled)
         _ = longSentinel
     }
+
 }

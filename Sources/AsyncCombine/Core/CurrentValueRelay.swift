@@ -47,6 +47,13 @@ public actor CurrentValueRelay<Value: Sendable> {
     /// the `AsyncStream` produced by ``stream()``.
     private var continuations = [UUID: AsyncStream<Value>.Continuation]()
 
+    /// Active background tasks that feed values into the relay.
+    ///
+    /// Each task forwards values from an external `AsyncSequence` into the relay
+    /// via ``send(_:)``. Tasks are retained for the lifetime of the relay and
+    /// automatically cancelled when the relay is deallocated.
+    private var feeds = [UUID: SubscriptionTask]()
+
     // MARK: - Lifecycle
 
     /// Creates a new relay with the given initial value.
@@ -55,6 +62,14 @@ public actor CurrentValueRelay<Value: Sendable> {
     ///   This value is immediately replayed to new subscribers.
     public init(_ initial: Value) {
         self.valueStorage = initial
+    }
+
+    deinit {
+        // Best effort, cancel any active pumps
+        for feed in self.feeds.values {
+            feed.cancel()
+        }
+        self.feeds.removeAll()
     }
 
 }
@@ -70,10 +85,18 @@ public extension CurrentValueRelay {
     ///
     /// Any listeners created with ``stream()`` will receive this value.
     func send(_ newValue: Value) {
-        valueStorage = newValue
+        self.valueStorage = newValue
         for continuation in continuations.values {
             continuation.yield(newValue)
         }
+    }
+
+    /// Attaches a background task as a feed for this relay.
+    ///
+    /// The feed is retained for the relay’s lifetime and cancelled
+    /// automatically when the relay is deallocated.
+    func attach(feed: SubscriptionTask) {
+        self.feeds[UUID()] = feed
     }
 
     /// Returns an `AsyncStream` that emits the relay’s current value immediately
@@ -99,7 +122,7 @@ public extension CurrentValueRelay {
     /// // "Got: update"
     /// ```
     nonisolated func stream() -> AsyncStream<Value> {
-        AsyncStream { continuation in
+        return AsyncStream { continuation in
             let id = UUID()
 
             // Register our continuation so we can broadcast to it

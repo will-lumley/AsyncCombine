@@ -14,7 +14,10 @@ extension AsyncStream {
     ) {
         var continuation: AsyncStream<Element>.Continuation!
 
-        let stream = AsyncStream<Element> { continuation = $0 }
+        let stream = AsyncStream<Element> {
+            continuation = $0
+        }
+
         return (stream, continuation)
     }
 
