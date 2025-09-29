@@ -36,17 +36,15 @@ final class AsyncSequenceSinkOnMainTests {
         // GIVEN a sinkOnMain that asserts main-thread execution
         stream
             .sinkOnMain(
-                catching: { _ in
-                    #expect(self.isOnMainThread())
+                catching: { @MainActor _ in
+                    // Intentionally left blank.
                 },
-                finished: {
-                    #expect(self.isOnMainThread())
+                finished: { @MainActor in
                     Task {
                         await finishedOnMain.set(true)
                     }
                 },
-                { value in
-                    #expect(self.isOnMainThread())
+                { @MainActor value in
                     await recorder.append(value)
                 }
             )
@@ -75,19 +73,18 @@ final class AsyncSequenceSinkOnMainTests {
         // GIVEN a throwing stream with sinkOnMain
         stream
             .sinkOnMain(
-                catching: { error in
+                catching: { @MainActor error in
                     #expect(Thread.isMainThread)
                     #expect(error is TestError)
                     Task { await errorCaptured.set(true) }
                 },
-                finished: {
+                finished: { @MainActor in
                     // Should not be called on error
                     Issue.record(
                         "Finished should not be called after error"
                     )
                 },
-                { value in
-                    #expect(self.isOnMainThread())
+                { @MainActor value in
                     await recorder.append(value)
                 }
             )
@@ -118,16 +115,13 @@ final class AsyncSequenceSinkOnMainTests {
 
         stream
             .sinkOnMain(
-                catching: { _ in
-                    #expect(self.isOnMainThread())
+                catching: { @MainActor _ in
                     Task { await errorCalled.set(true) }
                 },
-                finished: {
-                    #expect(self.isOnMainThread())
+                finished: { @MainActor in
                     Task { await finishedCalled.set(true) }
                 },
-                { value in
-                    #expect(self.isOnMainThread())
+                { @MainActor value in
                     await recorder.append(value)
                 }
             )
@@ -162,8 +156,7 @@ final class AsyncSequenceSinkOnMainTests {
 
         // GIVEN per-element work in the main-actor value handler
         stream
-            .sinkOnMain { value in
-                #expect(self.isOnMainThread())
+            .sinkOnMain { @MainActor value in
                 try? await Task.sleep(for: .milliseconds(15)) // simulate work
                 await recorder.append(value)
             }
@@ -188,12 +181,10 @@ final class AsyncSequenceSinkOnMainTests {
 
         stream
             .sinkOnMain(
-                finished: {
-                    #expect(self.isOnMainThread())
+                finished: { @MainActor in
                     Task { await finishedOnMain.set(true) }
                 },
-                { value in
-                    #expect(self.isOnMainThread())
+                { @MainActor value in
                     await recorder.append(value)
                 }
             )
@@ -211,10 +202,6 @@ final class AsyncSequenceSinkOnMainTests {
 
         #expect(await recorder.snapshot() == [42, 43])
         #expect(await finishedOnMain.get() == true)
-    }
-
-    func isOnMainThread() -> Bool {
-        return Thread.isMainThread
     }
 
 }
