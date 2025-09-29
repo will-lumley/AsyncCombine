@@ -9,7 +9,7 @@
 import Testing
 
 @Suite("AsyncCombine.Combine")
-struct CombineLatestTests {
+struct AsyncCombineCombineTests {
 
     // Small helper to hand-drive AsyncStreams from a test
     private struct StreamHandle<Element: Sendable> {
@@ -34,8 +34,7 @@ struct CombineLatestTests {
         let stream2 = StreamHandle<String>()
 
         // WHEN we combine them
-        let combined = AsyncCombine
-            .combineLatest(stream1.stream, stream2.stream)
+        let combined = AsyncCombine.combine(stream1.stream, stream2.stream)
 
         var it = combined.makeAsyncIterator()
 
@@ -66,7 +65,7 @@ struct CombineLatestTests {
         // GIVEN two controllable streams, already primed so we can iterate
         let stream1 = StreamHandle<Int>()
         let stream2 = StreamHandle<Int>()
-        let combined = AsyncCombine.combineLatest(
+        let combined = AsyncCombine.combine(
             stream1.stream,
             stream2.stream
         )

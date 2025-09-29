@@ -13,7 +13,7 @@ public enum AsyncCombine { }
 
 public extension AsyncCombine {
 
-    static func combineLatest<Stream1, Stream2>(
+    static func combine<Stream1, Stream2>(
         _ stream1: Stream1,
         _ stream2: Stream2
     ) -> AsyncStream<(Stream1.Element, Stream2.Element)>
