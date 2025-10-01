@@ -23,7 +23,7 @@ public extension AsyncCombine {
     ///   - stream1: First async sequence
     ///   - stream2: Second async sequence
     /// - Returns: AsyncStream of `(Element1, Element2)` tuples (combineLatest)
-    static func combine<Stream1, Stream2>(
+    static func CombineLatest<Stream1, Stream2>(
         _ stream1: Stream1,
         _ stream2: Stream2
     ) -> AsyncStream<(Stream1.Element, Stream2.Element)>

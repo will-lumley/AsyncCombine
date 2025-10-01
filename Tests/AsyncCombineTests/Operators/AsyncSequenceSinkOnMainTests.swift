@@ -81,7 +81,7 @@ final class AsyncSequenceSinkOnMainTests {
                     // Should not be called on error
                     Issue.record(
                         "Finished should not be called after error"
-                    )   
+                    )
                 },
                 { @MainActor value in
                     await recorder.append(value)

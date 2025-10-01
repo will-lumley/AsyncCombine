@@ -34,7 +34,7 @@ struct AsyncCombineCombineTests {
         let stream2 = StreamHandle<String>()
 
         // WHEN we combine them
-        let combined = AsyncCombine.combine(stream1.stream, stream2.stream)
+        let combined = AsyncCombine.CombineLatest(stream1.stream, stream2.stream)
 
         var it = combined.makeAsyncIterator()
 
@@ -65,7 +65,7 @@ struct AsyncCombineCombineTests {
         // GIVEN two controllable streams, already primed so we can iterate
         let stream1 = StreamHandle<Int>()
         let stream2 = StreamHandle<Int>()
-        let combined = AsyncCombine.combine(
+        let combined = AsyncCombine.CombineLatest(
             stream1.stream,
             stream2.stream
         )
