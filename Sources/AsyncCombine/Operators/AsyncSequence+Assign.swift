@@ -53,7 +53,6 @@ public extension AsyncSequence where Element: Sendable, Self: Sendable {
     ///     print("Assignment failed:", error)
     /// }
     /// ```
-    @discardableResult
     func assign<Root: AnyObject & Sendable>(
         to keyPath: ReferenceWritableKeyPath<Root, Element>,
         on object: Root,
@@ -68,5 +67,22 @@ public extension AsyncSequence where Element: Sendable, Self: Sendable {
             }
         }
     }
+
+    /*
+    func assignOnMain<Root: AnyObject & Sendable>(
+        to keyPath: ReferenceWritableKeyPath<Root, Element>,
+        on object: Root,
+        catching receiveError: @escaping MainActorReceiveError<Error> = { _ in }
+    ) -> SubscriptionTask {
+        let kp = NonSendableBox(keyPath)
+
+        return self.sinkOnMain(catching: receiveError) { [weak object, kp] value in
+            guard let object else {
+                return
+            }
+            object[keyPath: kp.value] = value
+        }
+    }
+     */
 
 }

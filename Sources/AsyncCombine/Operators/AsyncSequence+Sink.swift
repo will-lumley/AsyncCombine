@@ -48,7 +48,6 @@ public extension AsyncSequence where Element: Sendable, Self: Sendable {
     /// // Later, cancel the subscription
     /// subscriptions.first?.cancel()
     /// ```
-    @discardableResult
     func sink(
         catching receiveError: @escaping ReceiveError<Error> = { _ in },
         finished receiveFinished: @escaping ReceiveFinished = {},
@@ -70,13 +69,12 @@ public extension AsyncSequence where Element: Sendable, Self: Sendable {
     }
 
     /// Like `sink`, but guarantees the value/finish handlers run on the main actor.
-    @discardableResult
     func sinkOnMain(
         catching receiveError: @escaping MainActorReceiveError<Error> = { _ in },
         finished receiveFinished: @escaping MainActorReceiveFinished = {},
         _ receiveValue: @escaping MainActorReceiveElement<Element>
     ) -> SubscriptionTask {
-        return Task {
+        return Task { @MainActor in
             do {
                 for try await element in self {
                     await receiveValue(element)

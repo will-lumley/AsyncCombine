@@ -3,7 +3,6 @@
 import PackageDescription
 
 let dependencies: [PackageDescription.Package.Dependency] = [
-    // SwiftSoup is used to parse the HTML tree
     .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.4"),
     .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.3")
 ]
