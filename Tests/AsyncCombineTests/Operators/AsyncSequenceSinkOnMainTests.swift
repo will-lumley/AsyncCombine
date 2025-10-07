@@ -30,7 +30,7 @@ final class AsyncSequenceSinkOnMainTests {
     @Test("Value and Finished handlers run on MainActor")
     func valueAndFinishOnMainActor() async {
         let (stream, cont) = AsyncStream<Int>.makeStream()
-        let recorder = Recorder<Int>()
+        let recorder = RecordingBox<Int>()
         let finishedOnMain = AsyncBox(false)
 
         // GIVEN a sinkOnMain that asserts main-thread execution
@@ -67,7 +67,7 @@ final class AsyncSequenceSinkOnMainTests {
         enum TestError: Error { case boom }
 
         let (stream, cont) = AsyncThrowingStream<String, Error>.makeStream()
-        let recorder = Recorder<String>()
+        let recorder = RecordingBox<String>()
         let errorCaptured = AsyncBox(false)
 
         // GIVEN a throwing stream with sinkOnMain
@@ -108,7 +108,7 @@ final class AsyncSequenceSinkOnMainTests {
     @Test("Cancelling Prevents Further Values")
     func cancelPreventsFurtherValues_NoFinished() async {
         let (stream, cont) = AsyncStream<String>.makeStream()
-        let recorder = Recorder<String>()
+        let recorder = RecordingBox<String>()
         let finishedCalled = AsyncBox(false)
         let errorCalled = AsyncBox(false)
 
@@ -151,7 +151,7 @@ final class AsyncSequenceSinkOnMainTests {
     @Test("receiveValue is awaited sequentially on MainActor (preserves order with suspension)")
     func sequentialAwaitOnMainActor() async {
         let (stream, cont) = AsyncStream<Int>.makeStream()
-        let recorder = Recorder<Int>()
+        let recorder = RecordingBox<Int>()
 
         // GIVEN per-element work in the main-actor value handler
         stream
@@ -175,7 +175,7 @@ final class AsyncSequenceSinkOnMainTests {
     @Test("Works with background producers but still delivers on MainActor")
     func backgroundProducer_DeliversOnMainActor() async {
         let (stream, cont) = AsyncStream<Int>.makeStream()
-        let recorder = Recorder<Int>()
+        let recorder = RecordingBox<Int>()
         let finishedOnMain = AsyncBox(false)
 
         stream

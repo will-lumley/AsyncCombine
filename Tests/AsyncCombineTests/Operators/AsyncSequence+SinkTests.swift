@@ -30,7 +30,7 @@ final class AsyncSequenceSinkTests {
     @Test("Delivers Values in Order and Does Not Call receiveError on Normal Completion")
     func deliversInOrderNoErrorOnFinish() async {
         let (stream, cont) = AsyncStream<Int>.makeStream()
-        let recorder = Recorder<Int>()
+        let recorder = RecordingBox<Int>()
         let errorCalled = AsyncBox(false)
 
         // GIVEN we sink values, recording each one, and tracking error calls
@@ -64,7 +64,7 @@ final class AsyncSequenceSinkTests {
     @Test("Cancelling the Returned Task Stops Further Values")
     func cancelStopsFurtherValues() async {
         let (stream, cont) = AsyncStream<String>.makeStream()
-        let recorder = Recorder<String>()
+        let recorder = RecordingBox<String>()
 
         // GIVEN a sink storing into our task set
         stream.sink { value in
@@ -99,7 +99,7 @@ final class AsyncSequenceSinkTests {
         enum TestError: Error { case boom }
 
         let (stream, cont) = AsyncThrowingStream<String, Error>.makeStream()
-        let recorder = Recorder<String>()
+        let recorder = RecordingBox<String>()
         let capturedError = AsyncBox<Error?>(nil)
 
         // GIVEN a throwing stream whose errors are surfaced via `catching`
@@ -132,7 +132,7 @@ final class AsyncSequenceSinkTests {
     @Test("Storing in a Set Allows Mass-Cancellation via cancelAll()")
     func storeThenCancelAll() async {
         let (stream, cont) = AsyncStream<Int>.makeStream()
-        let recorder = Recorder<Int>()
+        let recorder = RecordingBox<Int>()
 
         // GIVEN a sink stored in our shared task set
         stream.sink { value in
@@ -162,7 +162,7 @@ final class AsyncSequenceSinkTests {
     @Test("receiveValue is Awaited Sequentially (preserves order even with suspension)")
     func receiveValueIsAwaitedSequentially() async {
         let (stream, cont) = AsyncStream<Int>.makeStream()
-        let recorder = Recorder<Int>()
+        let recorder = RecordingBox<Int>()
 
         // GIVEN a sink that simulates per-element work to test ordering
         stream.sink { value in

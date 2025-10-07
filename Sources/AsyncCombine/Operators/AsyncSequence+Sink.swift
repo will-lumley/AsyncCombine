@@ -83,7 +83,7 @@ public extension AsyncSequence where Element: Sendable, Self: Sendable {
             } catch is CancellationError {
                 // Expected on cancel
             } catch {
-                await receiveError(error)
+                receiveError(error)
             }
         }
     }
