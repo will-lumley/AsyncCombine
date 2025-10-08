@@ -33,7 +33,12 @@ public extension AsyncSequence where Element: Equatable & Sendable, Self: Sendab
         // Race the match against the timeout; whichever finishes first wins.
         return await withTaskGroup(of: Element?.self) { group in
             group.addTask {
-                try? await self.first(where: predicate)
+                do {
+                    return try await self.first(where: predicate)
+                } catch {
+                    // Swallow possible CancellationError, just end early
+                    return nil
+                }
             }
             group.addTask {
                 try? await clock.sleep(for: timeout)
