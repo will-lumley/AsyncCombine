@@ -29,7 +29,7 @@ jobs:
             ${{ runner.os }}-swift-
 
       - name: Set up Swift 6.2
-        uses: swift-actions/setup-swift@v2
+        uses: swift-actions/setup-swift@refs/pull/771/head
         with:
           swift-version: "6.2"
 

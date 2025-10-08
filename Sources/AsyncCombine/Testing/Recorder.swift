@@ -53,7 +53,9 @@ public actor Recorder<S: AsyncSequence & Sendable> where S.Element: Sendable {
         bufferingPolicy: AsyncStream<S.Element>.Continuation.BufferingPolicy = .unbounded
     ) {
         var cont: AsyncStream<S.Element>.Continuation!
-        let stream = AsyncStream<S.Element>(bufferingPolicy: bufferingPolicy) {
+        let stream = AsyncStream<S.Element>(
+            bufferingPolicy: bufferingPolicy
+        ) {
             cont = $0
         }
 
