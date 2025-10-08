@@ -23,15 +23,15 @@ jobs:
           path: |
             .build
             ~/.swiftpm
-          key: ${{ runner.os }}-swift-6.0-${{ hashFiles('**/Package.swift', '**/Package.resolved') }}
+          key: ${{ runner.os }}-swift-6.2-${{ hashFiles('**/Package.swift', '**/Package.resolved') }}
           restore-keys: |
-            ${{ runner.os }}-swift-6.0-
+            ${{ runner.os }}-swift-6.2-
             ${{ runner.os }}-swift-
 
-      - name: Set up Swift 6.0
+      - name: Set up Swift 6.2
         uses: swift-actions/setup-swift@v2
         with:
-          swift-version: "6.0"
+          swift-version: "6.2"
 
       - name: Resolve dependencies
         run: swift package resolve
