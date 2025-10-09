@@ -40,7 +40,7 @@ final class ObservedOperatorTests {
     func replayThenChanges() async {
         // Create a counter with a value of 41
         let counter = Counter(41)
-        let recorder = Recorder<Int>()
+        let recorder = RecordingBox<Int>()
 
         // GIVEN we listen to the value of our counter
         let stream = counter.observed(\.count)
@@ -112,7 +112,7 @@ final class ObservedOperatorTests {
         // GIVEN an observed counter stream and a recorder
         let counter = Counter(0)
         let stream = counter.observed(\.count)
-        let recorder = Recorder<Int>()
+        let recorder = RecordingBox<Int>()
 
         // AND we start collecting via sink
         stream.sink { value in
@@ -144,7 +144,7 @@ final class ObservedOperatorTests {
         // GIVEN an observed counter stream and a recorder
         let counter = Counter(0)
         let stream = counter.observed(\.count)
-        let recorder = Recorder<Int>()
+        let recorder = RecordingBox<Int>()
 
         // AND we start collecting via sink
         stream.sink { value in
@@ -184,7 +184,7 @@ final class ObservedOperatorTests {
 
         // AND we start observing after those changes
         let stream = counter.observed(\.count)
-        let rec = Recorder<Int>()
+        let rec = RecordingBox<Int>()
 
         stream.sink { value in
             await rec.append(value)

@@ -1,4 +1,4 @@
-// swift-tools-version:6.0
+// swift-tools-version:6.2
 
 import PackageDescription
 
@@ -18,8 +18,8 @@ let plugins: [Target.PluginUsage] = [
 let package = Package(
     name: "AsyncCombine",
     platforms: [
-        .iOS(.v15),
-        .macOS(.v12),
+        .iOS(.v17),
+        .macOS(.v13),
         .watchOS(.v8),
         .tvOS(.v15)
     ],

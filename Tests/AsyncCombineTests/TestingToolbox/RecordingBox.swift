@@ -6,7 +6,7 @@
 //
 
 /// Thread-safe value recorder for test assertions.
-actor Recorder<T: Sendable> {
+actor RecordingBox<T: Sendable> {
 
     private var values: [T] = []
 

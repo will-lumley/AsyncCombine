@@ -281,6 +281,68 @@ If your stream is non-throwing (e.g., `AsyncStream`, `relay.stream()`), just omi
 ### SwiftUI Tip
 SwiftUI already observes `@Observable` models. You usually don’t need `observed(_:)` inside a View for simple UI updates—bind directly to the model. Use `observed(_:)` when you need pipelines (`debounce`, `merge`, etc) or when binding to non-SwiftUI objects (eg., SpriteKit, UIKit).
 
+## 🧪 Testing
+
+AsyncCombine ships with lightweight testing utilities that make it easy to record, inspect, and assert values emitted by AsyncSequences.
+This lets you write deterministic async tests without manual loops, sleeps, or boilerplate cancellation logic.
+
+### 📹 Testing with Recorder
+
+The `Recorder` class helps you capture and assert values emitted by any `AsyncSequence`.
+
+It continuously consumes the sequence on a background task and buffers each element, allowing your test to await them one by one with predictable timing.
+
+```swift
+import AsyncCombine
+import Testing  // or XCTest
+
+@Test
+func testRelayEmitsExpectedValues() async throws {
+    let relay = CurrentValueRelay(0)
+    let recorder = relay.stream().record()
+
+    await relay.send(1)
+    await relay.send(2)
+
+    let first = try await recorder.next()
+    let second = try await recorder.next()
+
+    #expect(first == 1)
+    #expect(second == 2)
+}
+```
+
+`Recorder` makes it easy to verify asynchronous behaviour without juggling timers or nested loops.
+
+If the next value doesn’t arrive within the timeout window, it automatically reports a failure (via `Issue.record` or `XCTFail`, depending on your test framework).
+
+### 🥇 Finding the First Matching Value
+
+`AsyncCombine` also extends `AsyncSequence` with a convenience helper for asserting specific values without fully consuming the sequence.
+
+```swift
+import AsyncCombine
+import Testing
+
+@Test
+func testStreamEmitsSpecificValue() async throws {
+    let stream = AsyncStream<Int> { cont in
+        cont.yield(1)
+        cont.yield(2)
+        cont.yield(3)
+        cont.finish()
+    }
+
+    // Wait for the first element equal to 2.
+    let match = await stream.first(equalTo: 2)
+    #expect(match == 2)
+}
+```
+
+This suspends until the first matching element arrives, or returns nil if the sequence finishes first.
+
+It’s ideal when you just need to confirm that a certain value appears somewhere in an async stream.
+
 ## 📦 Installation
 
 Add this to your Package.swift:
