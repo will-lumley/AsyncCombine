@@ -38,7 +38,7 @@ struct CurrentValueRelayTests {
         await relay.send(1)
         await relay.send(2)
 
-        // THEN we should receive 1, 2, and 3
+        // THEN we should receive 0, 1, and 2
         let values = await stream.collect(count: 3)
         #expect(values == [0, 1, 2])
     }
