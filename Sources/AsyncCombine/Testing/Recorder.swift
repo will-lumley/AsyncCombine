@@ -14,7 +14,6 @@
 /// - Important: This was designed with unit testing in mind and is not suitable for
 /// production use.
 
-@available(iOS 16.0, macOS 13.0, *)
 public actor Recorder<S: AsyncSequence & Sendable> where S.Element: Sendable {
 
     // MARK: - Types
@@ -135,7 +134,6 @@ public actor Recorder<S: AsyncSequence & Sendable> where S.Element: Sendable {
 
 // MARK: - AsyncSequence
 
-@available(iOS 16.0, macOS 13.0, *)
 public extension AsyncSequence where Element: Sendable, Self: Sendable {
 
     /// Creates a `Recorder` that captures elements and lets you pull them one-by-one via `next()`.

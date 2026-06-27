@@ -23,13 +23,13 @@ import Foundation
 /// var subscriptions = Set<SubscriptionTask>()
 ///
 /// Task {
-///     for await value in relay.stream() {
+///     for await value in await relay.stream() {
 ///         print("Received:", value)
 ///     }
 /// }
 ///
-/// relay.send(1) // prints "Received: 1"
-/// relay.send(2) // prints "Received: 2"
+/// await relay.send(1) // prints "Received: 1"
+/// await relay.send(2) // prints "Received: 2"
 /// ```
 public actor CurrentValueRelay<Value: Sendable> {
 
@@ -39,7 +39,7 @@ public actor CurrentValueRelay<Value: Sendable> {
     ///
     /// When new listeners subscribe via ``stream()``, this value is emitted first,
     /// ensuring they always begin with the latest known state.
-    public private(set) var valueStorage: Value
+    public private(set) var value: Value
 
     /// The set of active continuations currently subscribed to updates from this relay.
     ///
@@ -61,7 +61,7 @@ public actor CurrentValueRelay<Value: Sendable> {
     /// - Parameter initial: The value to seed the relay with.
     ///   This value is immediately replayed to new subscribers.
     public init(_ initial: Value) {
-        self.valueStorage = initial
+        self.value = initial
     }
 
     deinit {
@@ -85,7 +85,7 @@ public extension CurrentValueRelay {
     ///
     /// Any listeners created with ``stream()`` will receive this value.
     func send(_ newValue: Value) {
-        self.valueStorage = newValue
+        self.value = newValue
         for continuation in continuations.values {
             continuation.yield(newValue)
         }
@@ -107,37 +107,42 @@ public extension CurrentValueRelay {
     /// The stream terminates automatically when the caller’s task is cancelled,
     /// or when the continuation is explicitly terminated.
     ///
+    /// Because the relay is an actor, the continuation is registered and the
+    /// current value replayed *before* this method returns. This guarantees
+    /// deterministic replay-then-updates ordering with no dropped values, even
+    /// if you `send(_:)` immediately afterwards.
+    ///
     /// ```swift
     /// let relay = CurrentValueRelay("initial")
     ///
     /// Task {
-    ///     for await value in relay.stream() {
+    ///     for await value in await relay.stream() {
     ///         print("Got:", value)
     ///     }
     /// }
     ///
-    /// relay.send("update")
+    /// await relay.send("update")
     /// // Prints:
     /// // "Got: initial"
     /// // "Got: update"
     /// ```
-    nonisolated func stream() -> AsyncStream<Value> {
-        return AsyncStream { continuation in
-            let id = UUID()
+    func stream() -> AsyncStream<Value> {
+        let (stream, continuation) = AsyncStream<Value>.makeStream()
+        let id = UUID()
 
-            // Register our continuation so we can broadcast to it
-            // later on.
+        // Register synchronously while isolated on the actor, then replay the
+        // latest value, so no updates can race ahead of registration.
+        self.continuations[id] = continuation
+        continuation.yield(self.value)
+
+        // If the continuation is terminated
+        continuation.onTermination = { [weak self] _ in
             Task {
-                await self.register(id: id, continuation: continuation)
-            }
-
-            // If the continuation is terminated
-            continuation.onTermination = { [weak self] _ in
-                Task {
-                    await self?.unregister(id: id)
-                }
+                await self?.unregister(id: id)
             }
         }
+
+        return stream
     }
 
 }
@@ -145,18 +150,6 @@ public extension CurrentValueRelay {
 // MARK: - Private
 
 private extension CurrentValueRelay {
-
-    /// Registers a continuation and immediately replays the current value to it.
-    ///
-    /// - Parameters:
-    ///   - id: A unique identifier for this continuation.
-    ///   - continuation: The continuation to register and notify.
-    func register(id: UUID, continuation: AsyncStream<Value>.Continuation) {
-        self.continuations[id] = continuation
-
-        // Replay latest value to the continuation
-        continuation.yield(self.valueStorage)
-    }
 
     /// Unregisters and removes the continuation associated with the given ID.
     ///

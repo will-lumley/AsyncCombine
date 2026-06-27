@@ -1,5 +1,5 @@
 //
-//  Untitled.swift
+//  Receive.swift
 //  AsyncCombine
 //
 //  Created by William Lumley on 16/9/2025.
@@ -39,7 +39,7 @@ public typealias ReceiveError<Failure: Error> = @Sendable (Failure) -> Void
 /// let relay = CurrentValueRelay(0)
 /// var subscriptions = Set<SubscriptionTask>()
 ///
-/// relay.stream()
+/// await relay.stream()
 ///     .sink(
 ///         finished: {
 ///             await print("Sequence finished!")

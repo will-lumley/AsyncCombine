@@ -7,7 +7,6 @@
 
 import Observation
 
-@available(iOS 17.0, macOS 14.0, watchOS 10, *)
 public extension Observable where Self: AnyObject {
 
     /// Zero-argument bridge: returns a `CurrentValueRelay` seeded from the first emission,

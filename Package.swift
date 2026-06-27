@@ -11,17 +11,13 @@ let targetDependencies: [Target.Dependency] = [
     .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
 ]
 
-let plugins: [Target.PluginUsage] = [
-
-]
-
 let package = Package(
     name: "AsyncCombine",
     platforms: [
         .iOS(.v17),
-        .macOS(.v13),
-        .watchOS(.v8),
-        .tvOS(.v15)
+        .macOS(.v14),
+        .watchOS(.v10),
+        .tvOS(.v17)
     ],
     products: [
         .library(
@@ -35,16 +31,14 @@ let package = Package(
     targets: [
         .target(
             name: "AsyncCombine",
-            dependencies: targetDependencies,
-            plugins: plugins
+            dependencies: targetDependencies
         ),
 
         .testTarget(
             name: "AsyncCombineTests",
             dependencies: [
                 "AsyncCombine"
-            ],
-            plugins: plugins
+            ]
         )
     ]
 )

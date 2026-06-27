@@ -19,7 +19,6 @@ public extension AsyncSequence where Element: Equatable & Sendable {
 
 }
 
-@available(iOS 16.0, macOS 13.0, *)
 public extension AsyncSequence where Element: Equatable & Sendable, Self: Sendable {
     /// Like above, but gives up after `timeout` and returns `nil`.
     @inlinable

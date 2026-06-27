@@ -11,10 +11,10 @@ import Testing
 @Suite("RecordingError")
 struct RecordingErrorTests {
 
-    @Test("Description")
-    func description() {
-        #expect(RecordingError.timeout.description == "Recorder timed out waiting for next()")
-        #expect(RecordingError.sourceEnded.description == "Recorder's source ended before a value was received")
+    @Test("Error Description")
+    func errorDescription() {
+        #expect(RecordingError.timeout.errorDescription == "Recorder timed out waiting for next()")
+        #expect(RecordingError.sourceEnded.errorDescription == "Recorder's source ended before a value was received")
     }
 
 }

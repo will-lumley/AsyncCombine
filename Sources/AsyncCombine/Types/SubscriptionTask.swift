@@ -18,13 +18,13 @@
 /// let relay = CurrentValueRelay(0)
 /// var subscriptions = Set<SubscriptionTask>()
 ///
-/// relay.stream()
+/// await relay.stream()
 ///     .sink { value in
 ///         print("Got:", value)
 ///     }
 ///     .store(in: &subscriptions)
 ///
-/// relay.send(1) // Prints "Got: 1"
+/// await relay.send(1) // Prints "Got: 1"
 /// ```
 ///
 /// Cancel the task to stop the subscription:

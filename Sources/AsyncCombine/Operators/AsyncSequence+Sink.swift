@@ -36,14 +36,14 @@ public extension AsyncSequence where Element: Sendable, Self: Sendable {
     /// let relay = CurrentValueRelay(0)
     /// var subscriptions = Set<SubscriptionTask>()
     ///
-    /// relay.stream()
+    /// await relay.stream()
     ///     .sink { value in
     ///         print("Got:", value)
     ///     }
     ///     .store(in: &subscriptions)
     ///
-    /// relay.send(1) // Prints "Got: 1"
-    /// relay.send(2) // Prints "Got: 2"
+    /// await relay.send(1) // Prints "Got: 1"
+    /// await relay.send(2) // Prints "Got: 2"
     ///
     /// // Later, cancel the subscription
     /// subscriptions.first?.cancel()
