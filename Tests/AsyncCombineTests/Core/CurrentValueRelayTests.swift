@@ -18,7 +18,7 @@ struct CurrentValueRelayTests {
         let relay = CurrentValueRelay<Int>(42)
 
         // WHEN we subscribe to the relay
-        let stream = relay.stream()
+        let stream = await relay.stream()
 
         // THEN we should immediately receive the value of 42
         #expect(await stream.collect() == 42)
@@ -30,9 +30,7 @@ struct CurrentValueRelayTests {
         let relay = CurrentValueRelay<Int>(0)
 
         // WHEN we subscribe to the relay
-        let stream = relay.stream()
-
-        try? await Task.sleep(nanoseconds: 40_000_000)
+        let stream = await relay.stream()
 
         // WHEN we send through 1 and 2
         await relay.send(1)
@@ -61,10 +59,8 @@ struct CurrentValueRelayTests {
         let relay = CurrentValueRelay<Int>(10)
 
         // Two independent subscribers
-        let stream1 = relay.stream()
-        let stream2 = relay.stream()
-
-        try? await Task.sleep(nanoseconds: 40_000_000)
+        let stream1 = await relay.stream()
+        let stream2 = await relay.stream()
 
         // Push two updates
         await relay.send(11)
@@ -78,16 +74,16 @@ struct CurrentValueRelayTests {
         #expect(bValues == [10, 11, 12])
     }
 
-    @Test("ValueStorage Reflects the Latest Sent Value")
-    func valueStorageTracksLatest() async {
+    @Test("Value Reflects the Latest Sent Value")
+    func valueTracksLatest() async {
         let relay = CurrentValueRelay<Int>(5)
-        #expect(await relay.valueStorage == 5)
+        #expect(await relay.value == 5)
 
         await relay.send(9)
-        #expect(await relay.valueStorage == 9)
+        #expect(await relay.value == 9)
 
         await relay.send(13)
-        #expect(await relay.valueStorage == 13)
+        #expect(await relay.value == 13)
     }
 
 }

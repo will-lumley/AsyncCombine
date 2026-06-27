@@ -36,14 +36,14 @@ public extension AsyncSequence where Element: Sendable, Self: Sendable {
     /// let holder = ViewHolder()
     /// var subscriptions = Set<SubscriptionTask>()
     ///
-    /// relay.stream()                // AsyncSequence<Element>
+    /// await relay.stream()          // AsyncSequence<Element>
     ///     .assign(
     ///         to: \.text,            // ReferenceWritableKeyPath<UILabel, String>
     ///         on: holder.label
     ///     )
     ///     .store(in: &subscriptions)
     ///
-    /// relay.send("Hello")           // label.text becomes "Hello" on main actor
+    /// await relay.send("Hello")     // label.text becomes "Hello" on main actor
     /// ```
     ///
     /// ## Error Handling
@@ -67,22 +67,5 @@ public extension AsyncSequence where Element: Sendable, Self: Sendable {
             }
         }
     }
-
-    /*
-    func assignOnMain<Root: AnyObject & Sendable>(
-        to keyPath: ReferenceWritableKeyPath<Root, Element>,
-        on object: Root,
-        catching receiveError: @escaping MainActorReceiveError<Error> = { _ in }
-    ) -> SubscriptionTask {
-        let kp = NonSendableBox(keyPath)
-
-        return self.sinkOnMain(catching: receiveError) { [weak object, kp] value in
-            guard let object else {
-                return
-            }
-            object[keyPath: kp.value] = value
-        }
-    }
-     */
 
 }

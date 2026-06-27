@@ -20,7 +20,7 @@ public extension Task where Success == Void, Failure == Never {
     /// ```swift
     /// var subscriptions = Set<SubscriptionTask>()
     ///
-    /// relay.stream()
+    /// await relay.stream()
     ///     .sink { value in
     ///         print("Got:", value)
     ///     }

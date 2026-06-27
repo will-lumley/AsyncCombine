@@ -84,10 +84,9 @@ viewModel.observed(\.count)
 - Exposes an AsyncStream for easy consumption in UI or domain code.
 
 ### 🔗 Publishers.CombineLatest Replacement
-- Pair two AsyncSequences and emit the latest tuple whenever either side produces a new element (after both have emitted at least once).
-- Finishes when both upstream sequences finish (CombineLatest semantics).
-- Cancellation of the downstream task cancels both upstream consumers.
-- Plays nicely with Swift Async Algorithms (e.g. you can map, debounce, etc. before/after).
+- Use Swift Async Algorithms' `combineLatest(_:_:)` to pair AsyncSequences and emit the latest tuple whenever either side produces a new element (after both have emitted at least once).
+- Finishes per CombineLatest semantics, and cancellation propagates to both upstreams.
+- Chain it straight into AsyncCombine's `sink`, `assign`, and `store(in:)`.
 
 ### ⚡ Async Algorithms Compatible
 - Compose richer pipelines using Swift Async Algorithms.
@@ -97,8 +96,8 @@ viewModel.observed(\.count)
 
 ### 🌍 Cross-Platform
 - AsyncCombine doesn’t rely on Combine or other Apple-only frameworks.
-- Runs anywhere Swift Concurrency works: iOS, macOS, tvOS, watchOS.
-- Fully portable to Linux and even SwiftWasm for server-side and web targets.
+- Runs anywhere Swift Concurrency works: iOS 17+, macOS 14+, tvOS 17+, watchOS 10+.
+- The `AsyncSequence` operators (`sink`, `assign`, `store(in:)`) and `CurrentValueRelay` are fully portable to Linux and SwiftWasm; the Observation-backed `observed(_:)` requires Apple platforms.
 - Ideal for writing platform-agnostic domain logic and unit tests.
 
 ## 🚀 Usage
@@ -157,7 +156,7 @@ Works the same for `NSTextField.textColor, `SKShapeNode.fillColor`, your own cla
 let relay = CurrentValueRelay(false)
 var subs = Set<SubscriptionTask>()
 
-relay.stream()
+await relay.stream()
     .map { $0 ? "ON" : "OFF" }
     .sink { print($0) }                // "OFF" immediately (replay)
     .store(in: &subs)
@@ -201,10 +200,10 @@ let b = AsyncStream<String> { cont in
     }
 }
 
-// combineLatest-style pairing
+// combineLatest-style pairing (from Swift Async Algorithms)
 var tasks = Set<SubscriptionTask>()
 
-AsyncCombine.CombineLatest(a, b)
+combineLatest(a, b)
     .map { i, s in "Pair: \(i) & \(s)" }
     .sink { print($0) }
     .store(in: &tasks)
@@ -275,7 +274,7 @@ If your stream is non-throwing (e.g., `AsyncStream`, `relay.stream()`), just omi
 - `observed(\.property)` → `AsyncStream<Value>` (replay-1, Observation-backed)
 - `sink { value in … }` → consume elements (returns Task you can cancel or `.store(in:)`)
 - `assign(to:on:)` → main-actor property binding
-- `CurrentValueRelay<Value>` → `send(_:)`, `stream(replay: true)`
+- `CurrentValueRelay<Value>` → `await send(_:)`, `await stream()` (replay-1)
 - `subscriptions.cancelAll()` → cancel everything (like clearing AnyCancellables)
 
 ### SwiftUI Tip
@@ -299,7 +298,7 @@ import Testing  // or XCTest
 @Test
 func testRelayEmitsExpectedValues() async throws {
     let relay = CurrentValueRelay(0)
-    let recorder = relay.stream().record()
+    let recorder = await relay.stream().record()
 
     await relay.send(1)
     await relay.send(2)
@@ -348,11 +347,21 @@ It’s ideal when you just need to confirm that a certain value appears somewher
 Add this to your Package.swift:
 ```swift
 dependencies: [
-    .package(url: "https://github.com/will-lumley/AsyncCombine.git", from: "1.0.3")
+    .package(url: "https://github.com/will-lumley/AsyncCombine.git", from: "2.0.0")
 ]
 ```
 
 Or in Xcode: File > Add Packages... and paste the repo URL.
+
+## 📚 Documentation
+
+AsyncCombine ships full DocC documentation. Generate it locally with the [Swift DocC Plugin](https://github.com/apple/swift-docc-plugin):
+
+```bash
+swift package --disable-sandbox generate-documentation --target AsyncCombine
+```
+
+Or in Xcode: Product > Build Documentation.
 
 ## Author
 

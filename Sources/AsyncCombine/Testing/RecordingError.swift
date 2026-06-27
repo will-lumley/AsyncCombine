@@ -1,15 +1,17 @@
 //
 //  RecordingError.swift
-//  AsyncCombineAsyncCombineTesting
+//  AsyncCombine
 //
 //  Created by William Lumley on 7/10/2025.
 //
 
-public enum RecordingError: Error, Sendable {
+import Foundation
+
+public enum RecordingError: Error, LocalizedError, Sendable {
     case timeout
     case sourceEnded
 
-    var description: String {
+    public var errorDescription: String? {
         switch self {
         case .timeout:
             "Recorder timed out waiting for next()"

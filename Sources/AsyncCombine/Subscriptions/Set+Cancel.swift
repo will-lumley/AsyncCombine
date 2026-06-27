@@ -19,11 +19,11 @@ public extension Set where Element == SubscriptionTask {
     /// ```swift
     /// var subscriptions = Set<SubscriptionTask>()
     ///
-    /// relay.stream()
+    /// await relay.stream()
     ///     .sink { value in print("Got:", value) }
     ///     .store(in: &subscriptions)
     ///
-    /// relay.stream()
+    /// await relay.stream()
     ///     .assign(to: \.text, on: label)
     ///     .store(in: &subscriptions)
     ///

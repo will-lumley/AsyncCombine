@@ -7,7 +7,6 @@
 
 import Observation
 
-@available(iOS 17.0, macOS 14.0, watchOS 10, *)
 public extension Observable where Self: AnyObject {
 
     /// Creates an `AsyncStream` that emits values of a given property whenever
