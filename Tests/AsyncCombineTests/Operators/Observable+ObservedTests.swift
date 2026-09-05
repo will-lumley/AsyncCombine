@@ -27,6 +27,12 @@ final class ObservedOperatorTests {
         }
     }
 
+    /// A model owned by an actor other than the main actor, so tests can mutate it off
+    /// the main actor without racing the stream's read.
+    @Observable @SimActor
+    final class Gate: @unchecked Sendable {
+        var input: Int = 0
+    }
     // MARK: - Lifecycle
 
     deinit {
@@ -168,8 +174,14 @@ final class ObservedOperatorTests {
         // AND give time for the coalescing/re-registration path
         try? await Task.sleep(nanoseconds: 120_000_000)
 
-        // THEN only the first replay and the final value are emitted
-        #expect(await recorder.snapshot() == [0, 5])
+        // THEN the replay is followed by the final value. Every mutation is now
+        // reported (observation is re-armed synchronously), but each report reads the
+        // property one hop later, by which point the burst has settled on 5 — so the
+        // same value can legitimately arrive more than once.
+        let snapshot = await recorder.snapshot()
+        #expect(snapshot.first == 0)
+        #expect(snapshot.last == 5)
+        #expect(snapshot.dropFirst().allSatisfy { $0 == 5 })
     }
 
     @MainActor
@@ -201,6 +213,145 @@ final class ObservedOperatorTests {
 
         // THEN it appends after the replay
         #expect(await rec.snapshot() == [12, 13])
+    }
+
+
+    @Test("A Mutation Landing During Re-Registration Is Still Delivered")
+    func mutationDuringReRegistrationIsDelivered() async {
+        let counter = await MainActor.run { Counter(0) }
+        let recorder = RecordingBox<Int>()
+        let stream = await MainActor.run { counter.observed(\.count) }
+
+        let consumer: SubscriptionTask = Task {
+            for await value in stream {
+                await recorder.append(value)
+                if value == 2 {
+                    break
+                }
+            }
+        }
+
+        // Two mutations separated by exactly one main-actor hop - the width of the
+        // unobserved window in the old implementation.
+        await MainActor.run { counter.count = 1 }
+        await Task.yield()
+        await MainActor.run { counter.count = 2 }
+
+        // Hangs if the second mutation lands while the stream is re-registering and is
+        // therefore never reported, because nothing else ever writes.
+        _ = await withTimeout(.seconds(2)) { await consumer.value }
+        consumer.cancel()
+
+        #expect(await recorder.snapshot().contains(2))
+    }
+
+    @MainActor
+    @Test("Every Change Is Reported, Even Within a Single Main-Actor Turn")
+    func everyChangeWithinOneTurnIsReported() async {
+        // GIVEN an observed counter stream and a recorder
+        let counter = Counter(0)
+        let stream = counter.observed(\.count)
+        let recorder = RecordingBox<Int>()
+
+        stream.sink { value in
+            await recorder.append(value)
+        }
+        .store(in: &tasks)
+
+        // THEN we first replay the current value (0)
+        try? await Task.sleep(nanoseconds: 40_000_000)
+        #expect(await recorder.snapshot() == [0])
+
+        // WHEN three mutations land inside a single main-actor turn, so none of them
+        // can be separated by the hop the stream uses to read the new value
+        await MainActor.run {
+            counter.count = 1
+            counter.count = 2
+            counter.count = 3
+        }
+        try? await Task.sleep(nanoseconds: 120_000_000)
+
+        // THEN all three are reported. Re-registration happens synchronously inside
+        // `onChange`, so the property is never left unobserved; the reads are deferred
+        // by one hop, so all three resolve to the settled value.
+        //
+        // Before the fix the second and third mutations landed while the property was
+        // unobserved and were never reported at all, leaving [0, 3].
+        #expect(await recorder.snapshot() == [0, 3, 3, 3])
+    }
+
+    @MainActor
+    @Test("observedRelay Reports Every Change Too")
+    func observedRelayReportsEveryChange() async {
+        // GIVEN a relay built on `observed(_:)`
+        let counter = Counter(0)
+        let relay = counter.observedRelay(\.count)
+        let recorder = RecordingBox<Int>()
+
+        let consumer: SubscriptionTask = Task {
+            for await value in await relay.stream() {
+                await recorder.append(value)
+            }
+        }
+        consumer.store(in: &tasks)
+
+        // AND the relay has seeded and the feed has started
+        try? await Task.sleep(nanoseconds: 40_000_000)
+
+        // WHEN three mutations land inside a single main-actor turn
+        await MainActor.run {
+            counter.count = 1
+            counter.count = 2
+            counter.count = 3
+        }
+        try? await Task.sleep(nanoseconds: 120_000_000)
+
+        // THEN all three changes reach the relay's subscribers. The count of leading
+        // zeroes depends on whether the subscriber beat the feed's replay, so assert on
+        // the change events only - before the fix just one of the three arrived.
+        let snapshot = await recorder.snapshot()
+        #expect(snapshot.filter { $0 == 3 }.count == 3)
+        #expect(snapshot.last == 3)
+    }
+
+
+    @Test("A Model Owned by Another Actor Is Read on That Actor, Not the Main One")
+    func nonMainActorModelDeliversEveryChange() async {
+        // GIVEN a model that lives on `SimActor` rather than the main actor
+        let recorder = RecordingBox<Int>()
+
+        // The key path has to be formed on `SimActor`, since that is what isolates the
+        // property - which is exactly the isolation the stream then reads on.
+        let (gate, stream) = await SimActor.run { () -> (Gate, AsyncStream<Int>) in
+            let gate = Gate()
+            return (gate, gate.observed(\.input, isolation: SimActor.shared))
+        }
+
+        let consumer: SubscriptionTask = Task {
+            for await value in stream {
+                await recorder.append(value)
+            }
+        }
+
+        try? await Task.sleep(nanoseconds: 40_000_000)
+        #expect(await recorder.snapshot() == [0])
+
+        // WHEN it is mutated on its own actor, in a single turn
+        await SimActor.run {
+            gate.input = 1
+            gate.input = 2
+            gate.input = 3
+        }
+        try? await Task.sleep(nanoseconds: 120_000_000)
+
+        // THEN every change is reported and none of them reads a value that had not
+        // been stored yet. Reading on the main actor instead would race the writer:
+        // `onChange` fires before the store, so a main-actor read can land first and
+        // report the previous value - and the change that was missed is never retried.
+        let snapshot = await recorder.snapshot()
+        #expect(snapshot == [0, 3, 3, 3])
+
+        consumer.cancel()
     }
 
 }
