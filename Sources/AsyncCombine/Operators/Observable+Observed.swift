@@ -104,62 +104,84 @@ public extension Observable where Self: AnyObject {
         })
 
         return AsyncStream(bufferingPolicy: .unbounded) { continuation in
-            Task {
-                await perform(on: owner) {
-                    guard let value = read.value() else {
+            schedule(on: owner) {
+                guard let value = read.value() else {
+                    continuation.finish()
+                    return
+                }
+
+                // Replay current value
+                continuation.yield(value)
+
+                // Define the tracking body without creating a
+                // nested function to capture.
+                repeater.call = {
+                    guard read.value() != nil else {
                         continuation.finish()
                         return
                     }
 
-                    // Replay current value
-                    continuation.yield(value)
+                    withObservationTracking {
+                        // Register the read
+                        _ = read.value()
+                    } onChange: {
+                        // Re-arm synchronously. Tracking is cancelled the moment this
+                        // closure returns, so anything deferred to a `Task` leaves the
+                        // property unobserved in between — and a mutation landing in
+                        // that window is never reported, because the next registration
+                        // only fires on the mutation *after* it.
+                        repeater.call?()
 
-                    // Define the tracking body without creating a
-                    // nested function to capture.
-                    repeater.call = {
-                        guard read.value() != nil else {
-                            continuation.finish()
-                            return
-                        }
-
-                        withObservationTracking {
-                            // Register the read
-                            _ = read.value()
-                        } onChange: {
-                            // Re-arm synchronously. Tracking is cancelled the moment
-                            // this closure returns, so anything deferred to a `Task`
-                            // leaves the property unobserved in between — and a mutation
-                            // landing in that window is never reported, because the next
-                            // registration only fires on the mutation *after* it.
-                            repeater.call?()
-
-                            // The read stays deferred: `onChange` runs during `willSet`,
-                            // so the new value has not been committed yet and reading
-                            // here would yield the previous one. Hopping to `owner` is
-                            // what orders this read after the store - the mutating job
-                            // holds that actor until it has finished writing.
-                            Task {
-                                await perform(on: owner) {
-                                    guard let value = read.value() else {
-                                        continuation.finish()
-                                        return
-                                    }
-                                    continuation.yield(value)
-                                }
+                        // The read stays deferred: `onChange` runs during `willSet`, so
+                        // the new value has not been committed yet and reading here
+                        // would yield the previous one. Going through `owner` is what
+                        // orders this read after the store - the mutating job holds
+                        // that actor until it has finished writing.
+                        schedule(on: owner) {
+                            guard let value = read.value() else {
+                                continuation.finish()
+                                return
                             }
+                            continuation.yield(value)
                         }
                     }
-
-                    // Start tracking
-                    repeater.call?()
                 }
+
+                // Start tracking
+                repeater.call?()
             }
         }
     }
 
+
 }
 
 // MARK: - Private
+
+/// Enqueues `body` onto `owner`.
+///
+/// The main actor gets a direct enqueue rather than a hop through the generic executor
+/// first. That ordering matters: a deferred read has to stay behind whatever was
+/// already queued on the actor when the change fired, and an extra hop lets a later
+/// mutation queue ahead of an earlier read, so the stream reports the newer value
+/// twice and skips the one in between. No change is lost either way, but the sequence
+/// is only faithful when the enqueue is direct.
+private func schedule(
+    on owner: any Actor,
+    _ body: @escaping @Sendable () -> Void
+) {
+    if owner === MainActor.shared {
+        Task { @MainActor in
+            body()
+        }
+    } else {
+        Task {
+            await perform(on: owner) {
+                body()
+            }
+        }
+    }
+}
 
 /// Runs `body` on `actor`'s executor.
 ///
