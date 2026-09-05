@@ -26,6 +26,13 @@ final class ObservedOperatorTests {
             self.count = count
         }
     }
+
+    /// A model owned by an actor other than the main actor, so tests can mutate it off
+    /// the main actor without racing the stream's read.
+    @Observable @SimActor
+    final class Gate: @unchecked Sendable {
+        var input: Int = 0
+    }
     // MARK: - Lifecycle
 
     deinit {
@@ -305,6 +312,46 @@ final class ObservedOperatorTests {
         let snapshot = await recorder.snapshot()
         #expect(snapshot.filter { $0 == 3 }.count == 3)
         #expect(snapshot.last == 3)
+    }
+
+
+    @Test("A Model Owned by Another Actor Is Read on That Actor, Not the Main One")
+    func nonMainActorModelDeliversEveryChange() async {
+        // GIVEN a model that lives on `SimActor` rather than the main actor
+        let recorder = RecordingBox<Int>()
+
+        // The key path has to be formed on `SimActor`, since that is what isolates the
+        // property - which is exactly the isolation the stream then reads on.
+        let (gate, stream) = await SimActor.run { () -> (Gate, AsyncStream<Int>) in
+            let gate = Gate()
+            return (gate, gate.observed(\.input, isolation: SimActor.shared))
+        }
+
+        let consumer: SubscriptionTask = Task {
+            for await value in stream {
+                await recorder.append(value)
+            }
+        }
+
+        try? await Task.sleep(nanoseconds: 40_000_000)
+        #expect(await recorder.snapshot() == [0])
+
+        // WHEN it is mutated on its own actor, in a single turn
+        await SimActor.run {
+            gate.input = 1
+            gate.input = 2
+            gate.input = 3
+        }
+        try? await Task.sleep(nanoseconds: 120_000_000)
+
+        // THEN every change is reported and none of them reads a value that had not
+        // been stored yet. Reading on the main actor instead would race the writer:
+        // `onChange` fires before the store, so a main-actor read can land first and
+        // report the previous value - and the change that was missed is never retried.
+        let snapshot = await recorder.snapshot()
+        #expect(snapshot == [0, 3, 3, 3])
+
+        consumer.cancel()
     }
 
 }
