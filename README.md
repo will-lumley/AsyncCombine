@@ -150,27 +150,44 @@ Works the same for `NSTextField.textColor, `SKShapeNode.fillColor`, your own cla
 
 ### Use CurrentValueRelay for hot, replay-1 state
 
-`CurrentValueRelay<Value>` holds the latest value and broadcasts it to all listeners. `stream()` yields the current value immediately, then subsequent updates.
+`CurrentValueRelay<Value>` holds the latest value and broadcasts it to all listeners. Subscribing yields the current value immediately, then subsequent updates.
+
+Most subscriptions are built from synchronous code — `configureBindings()`, a view model’s `init`, `viewDidLoad()` — because that’s where `.store(in:)` lives. Use `values()` there:
 
 ```swift
 let relay = CurrentValueRelay(false)
 var subs = Set<SubscriptionTask>()
 
-await relay.stream()
+relay.values()                         // no `await` — usable from sync code
     .map { $0 ? "ON" : "OFF" }
-    .sink { print($0) }                // "OFF" immediately (replay)
+    .sink { print($0) }                // "OFF" replayed, then every later update
     .store(in: &subs)
-
-Task {
-    await relay.send(true)             // prints "ON"
-    await relay.send(false)            // prints "OFF"
-}
 ```
 
-Cancel tasks when you’re done (e.g., deinit).
+The subscriber starts with the relay's value as of the moment it registers, then follows every subsequent `send(_:)`. If you need the sends you make *right after* subscribing to arrive as their own elements, see `stream()` below.
+
+Cancel tasks when you’re done (e.g., deinit). Subscriptions don’t end on their own when the relay deallocates — like `observed(_:)`, the consumer is the one that cancels.
 
 ```swift
 subs.cancelAll()
+```
+
+#### `values()` vs `stream()`
+
+Both give you a replay-1 `AsyncStream`. They differ only in *when* the subscription is registered on the relay:
+
+| | Registration | Use it when |
+|---|---|---|
+| `values()` | One hop after the call returns | You’re in a synchronous context and the replayed current value is the only initial state you need — UI bindings, view-model wiring |
+| `await stream()` | Before the call returns, while isolated on the relay | The ordering against a subsequent `send(_:)` matters — tests, and any producer/consumer pair set up together |
+
+Because `values()` registers one hop later, a `send(_:)` issued in that window isn’t delivered as its own element. The subscriber still gets the relay’s value as of the moment it registers, so it never starts without state — but if you need every intermediate update from the instant you subscribe, use `stream()`:
+
+```swift
+// Deterministic: the subscription is registered before `send(_:)` runs.
+let stream = await relay.stream()
+await relay.send(true)
+// stream yields false (replay), then true
 ```
 
 ### Combine multiple AsyncSequences into a single AsyncSequence
@@ -267,14 +284,14 @@ someThrowingAsyncSequence   // AsyncSequence whose iterator `next()` can throw
     }
     .store(in: &subscriptions)
 ```
-If your stream is non-throwing (e.g., `AsyncStream`, `relay.stream()`), just omit `catching:`.
+If your stream is non-throwing (e.g., `AsyncStream`, `relay.values()`), just omit `catching:`.
 
 ### Quick Reference
 
 - `observed(\.property)` → `AsyncStream<Value>` (replay-1, Observation-backed)
 - `sink { value in … }` → consume elements (returns Task you can cancel or `.store(in:)`)
 - `assign(to:on:)` → main-actor property binding
-- `CurrentValueRelay<Value>` → `await send(_:)`, `await stream()` (replay-1)
+- `CurrentValueRelay<Value>` → `await send(_:)`, `values()` (replay-1, sync call site), `await stream()` (replay-1, ordered against `send(_:)`)
 - `subscriptions.cancelAll()` → cancel everything (like clearing AnyCancellables)
 
 ### SwiftUI Tip
@@ -347,7 +364,7 @@ It’s ideal when you just need to confirm that a certain value appears somewher
 Add this to your Package.swift:
 ```swift
 dependencies: [
-    .package(url: "https://github.com/will-lumley/AsyncCombine.git", from: "2.0.0")
+    .package(url: "https://github.com/will-lumley/AsyncCombine.git", from: "2.2.0")
 ]
 ```
 
