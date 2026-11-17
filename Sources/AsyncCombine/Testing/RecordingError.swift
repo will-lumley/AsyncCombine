@@ -5,7 +5,11 @@
 //  Created by William Lumley on 7/10/2025.
 //
 
+#if os(WASI)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
 public enum RecordingError: Error, LocalizedError, Sendable {
     case timeout

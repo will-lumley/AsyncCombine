@@ -5,7 +5,11 @@
 //  Created by William Lumley on 15/9/2025.
 //
 
+#if os(WASI)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
 /// A concurrency-friendly, replay-1 relay for broadcasting the latest value
 /// to multiple listeners using `AsyncStream`.
